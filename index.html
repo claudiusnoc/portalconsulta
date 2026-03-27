@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BI Compras | Claro Infra MG</title>
+  <meta name="description" content="Dashboard de Business Intelligence para o Controle de Compras 2026 - Contrato Claro Infra MG BH Metro." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="index.css" />
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo-mark">
+        <span class="logo-icon">
+          <img src="assets/eqs-logo.svg" alt="EQS" width="28" height="28" />
+        </span>
+        <div class="logo-text">
+          <strong>EQS</strong>
+          <span>Engenharia</span>
+        </div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item active" id="nav-dashboard" onclick="showView('dashboard')">
+        <span class="nav-icon"><i data-lucide="layout-dashboard"></i></span>
+        <span>Dashboard</span>
+      </a>
+      <a href="#" class="nav-item" id="nav-pedidos" onclick="showView('pedidos')">
+        <span class="nav-icon"><i data-lucide="clipboard-list"></i></span>
+        <span>Pedidos</span>
+      </a>
+      <a href="#" class="nav-item" id="nav-status" onclick="showView('status')">
+        <span class="nav-icon"><i data-lucide="bar-chart-3"></i></span>
+        <span>Status</span>
+      </a>
+
+      <div class="nav-divider"></div>
+      <p class="nav-section-title">DADOS</p>
+
+      <div class="sharepoint-config">
+        <button class="sp-btn" onclick="publishToCloud()">
+          <i data-lucide="upload-cloud" style="width:14px;height:14px"></i>
+          Publicar para Equipe
+        </button>
+        <div class="sp-status" id="spStatus">Importe a planilha para começar.</div>
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="theme-switch-wrap">
+        <div class="theme-switch-label">
+          <i data-lucide="sun" class="theme-icon-light"></i>
+          <i data-lucide="moon" class="theme-icon-dark"></i>
+        </div>
+        <label class="theme-toggle">
+          <input type="checkbox" id="darkModeToggle" onchange="toggleDarkMode()" />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div class="sidebar-contract">
+        <span>Contrato:</span>
+        <strong>Claro Infra MG</strong>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+
+    <!-- Header -->
+    <header class="top-bar">
+      <div class="top-bar-left">
+        <button class="menu-toggle" onclick="toggleSidebar()" title="Menu" id="menu-btn">☰</button>
+        <div>
+          <h1 class="page-title">Controle de Compras 2026</h1>
+          <p class="page-subtitle" id="dashboard-subtitle">Mês Atual · BH Metro ADM · EQS Engenharia</p>
+        </div>
+      </div>
+      <div class="top-bar-right">
+        <div class="search-wrap">
+          <span class="search-icon"><i data-lucide="search" style="width:16px;height:16px"></i></span>
+          <input type="text" id="globalSearch" class="search-input" placeholder="Buscar pedido, SM, descrição..." oninput="applyFilters()" />
+        </div>
+        <!-- Importar Excel -->
+        <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none" onchange="handleFileInput(event)" />
+        <button class="btn-import" id="importBtn" onclick="document.getElementById('fileInput').click()" title="Importar planilha Excel">
+          <i data-lucide="download" style="width:16px;height:16px"></i> Importar Excel
+        </button>
+        <button class="btn-sync" id="btnSyncHeader" onclick="publishToCloud()" title="Publicar dados para equipe" style="display:none">
+          <i data-lucide="upload-cloud" style="width:16px;height:16px"></i> Publicar
+        </button>
+        <div class="sync-badge" id="syncBadge" style="display:none">
+          <span class="sync-dot"></span>
+          <span id="syncTime">Sincronizado agora</span>
+        </div>
+        <div class="date-badge" id="currentDate"></div>
+      </div>
+    </header>
+
+    <!-- DROP OVERLAY -->
+    <div id="dropOverlay" class="drop-overlay" style="display:none">
+      <div class="drop-box">
+        <div class="drop-icon"><i data-lucide="folder-open" style="width:48px;height:48px"></i></div>
+        <p class="drop-title">Solte o arquivo Excel aqui</p>
+        <p class="drop-sub">COMPRAS FAT A.xlsx</p>
+      </div>
+    </div>
+
+    <!-- DASHBOARD VIEW -->
+    <section id="view-dashboard" class="view active">
+
+      <!-- KPI Cards -->
+      <div class="kpi-grid">
+        <div class="kpi-card kpi-total clickable" onclick="filterByKPI('total')">
+          <div class="kpi-header">
+            <div class="kpi-icon-box"><i data-lucide="package" class="kpi-icon"></i></div>
+          </div>
+          <div class="kpi-body">
+            <p class="kpi-label">Total de Pedidos</p>
+            <h2 class="kpi-value" id="kpi-total">0</h2>
+          </div>
+          <div class="kpi-bar"><div class="kpi-fill fill-purple" id="bar-total" style="width: 100%"></div></div>
+        </div>
+
+        <div class="kpi-card kpi-finalizado clickable" onclick="filterByKPI('finalizado')">
+          <div class="kpi-header">
+            <div class="kpi-icon-box"><i data-lucide="circle-check-big" class="kpi-icon"></i></div>
+          </div>
+          <div class="kpi-body">
+            <p class="kpi-label">Finalizados</p>
+            <h2 class="kpi-value" id="kpi-finalizado">0</h2>
+          </div>
+          <div class="kpi-bar"><div class="kpi-fill fill-green" id="bar-finalizado"></div></div>
+        </div>
+
+        <div class="kpi-card kpi-andamento clickable" onclick="filterByKPI('andamento')">
+          <div class="kpi-header">
+            <div class="kpi-icon-box"><i data-lucide="loader" class="kpi-icon"></i></div>
+          </div>
+          <div class="kpi-body">
+            <p class="kpi-label">Em Andamento</p>
+            <h2 class="kpi-value" id="kpi-andamento">0</h2>
+          </div>
+          <div class="kpi-bar"><div class="kpi-fill fill-blue" id="bar-andamento"></div></div>
+        </div>
+
+        <div class="kpi-card kpi-analise clickable" onclick="filterByKPI('analise')">
+          <div class="kpi-header">
+            <div class="kpi-icon-box"><i data-lucide="hourglass" class="kpi-icon"></i></div>
+          </div>
+          <div class="kpi-body">
+            <p class="kpi-label">Em Análise / Pendente</p>
+            <h2 class="kpi-value" id="kpi-analise">0</h2>
+          </div>
+          <div class="kpi-bar"><div class="kpi-fill fill-yellow" id="bar-analise"></div></div>
+        </div>
+
+        <div class="kpi-card kpi-aprovado clickable" onclick="filterByKPI('aprovado')">
+          <div class="kpi-header">
+            <div class="kpi-icon-box"><i data-lucide="badge-check" class="kpi-icon"></i></div>
+          </div>
+          <div class="kpi-body">
+            <p class="kpi-label">Aprovados</p>
+            <h2 class="kpi-value" id="kpi-aprovado">0</h2>
+          </div>
+          <div class="kpi-bar"><div class="kpi-fill fill-green" id="bar-aprovado"></div></div>
+        </div>
+
+        <div class="kpi-card kpi-rejeitado clickable" onclick="filterByKPI('rejeitado')">
+          <div class="kpi-header">
+            <div class="kpi-icon-box icon-red"><i data-lucide="circle-x" class="kpi-icon"></i></div>
+          </div>
+          <div class="kpi-body">
+            <p class="kpi-label">Rejeitados</p>
+            <h2 class="kpi-value" id="kpi-rejeitado">0</h2>
+          </div>
+          <div class="kpi-bar"><div class="kpi-fill fill-red" id="bar-rejeitado"></div></div>
+        </div>
+      </div>
+
+      <!-- Charts Row -->
+      <div class="charts-row">
+        <div class="chart-card chart-big">
+          <h3 class="chart-title">Status dos Pedidos</h3>
+          <canvas id="chartStatus" height="220"></canvas>
+        </div>
+        <div class="chart-card chart-small">
+          <h3 class="chart-title">Aprovação</h3>
+          <canvas id="chartAprov" height="220"></canvas>
+        </div>
+        <div class="chart-card chart-small">
+          <h3 class="chart-title">Pedidos por Mês</h3>
+          <canvas id="chartMes" height="220"></canvas>
+        </div>
+      </div>
+
+      <!-- Recent Table Preview -->
+      <div class="table-card">
+        <div class="table-card-header">
+          <h3 class="chart-title">Últimas Movimentações</h3>
+          <button class="btn-secondary" onclick="showView('pedidos')">Ver todos →</button>
+        </div>
+        <div class="table-wrap">
+          <table id="tablePreview" class="data-table">
+            <thead>
+              <tr>
+                <th>SM</th>
+                <th>Pedido</th>
+                <th>Emissão</th>
+                <th>Status</th>
+                <th>Aprovação</th>
+                <th>Descrição</th>
+                <th>Fonte</th>
+                <th>Atualização</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-preview"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- PEDIDOS VIEW -->
+    <section id="view-pedidos" class="view">
+      <div class="filters-bar">
+        <select id="filterStatus" class="filter-select" onchange="applyFilters()">
+          <option value="">Todos os Status</option>
+          <option value="FINALIZADO">Finalizado</option>
+          <option value="EM PROCESSO/PARCIAL">Em Processo/Parcial</option>
+          <option value="AGUARD. ENTREGA/COLETA">Aguard. Entrega/Coleta</option>
+          <option value="EM ANALISE COMPRAS">Em Análise Compras</option>
+          <option value="ENVIAR REPARO AGST">Enviar Reparo AGST</option>
+          <option value="ELIMINADO POR RESIDUO">Eliminado por Resíduo</option>
+        </select>
+        <select id="filterAprov" class="filter-select" onchange="applyFilters()">
+          <option value="">Todas as Aprovações</option>
+          <option value="APROVADO">Aprovado</option>
+          <option value="HUGO ALEXANDRE">Hugo Alexandre</option>
+          <option value="PENDENTE">Pendente</option>
+        </select>
+        <select id="filterMes" class="filter-select" onchange="applyFilters()">
+          <option value="">Todos os Meses</option>
+          <option value="01">Janeiro</option>
+          <option value="02">Fevereiro</option>
+          <option value="03">Março</option>
+          <option value="04">Abril</option>
+          <option value="05">Maio</option>
+          <option value="06">Junho</option>
+          <option value="07">Julho</option>
+          <option value="08">Agosto</option>
+          <option value="09">Setembro</option>
+          <option value="10">Outubro</option>
+          <option value="11">Novembro</option>
+          <option value="12">Dezembro</option>
+        </select>
+        <span class="filter-count" id="filterCount"></span>
+      </div>
+      <div class="table-card">
+        <div class="table-wrap">
+          <table id="tablePedidos" class="data-table">
+            <thead>
+              <tr>
+                <th>SM</th>
+                <th>Pedido</th>
+                <th>Emissão</th>
+                <th>Status</th>
+                <th>Aprovação</th>
+                <th>Descrição</th>
+                <th>Fonte</th>
+                <th>Atualização</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-pedidos"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- STATUS VIEW -->
+    <section id="view-status" class="view">
+      <div class="status-legend-grid">
+        <div class="legend-card">
+          <span class="badge badge-finalizado">FINALIZADO</span>
+          <p>Pedido concluído, material entregue ou serviço executado.</p>
+        </div>
+        <div class="legend-card">
+          <span class="badge badge-parcial">EM PROCESSO/PARCIAL</span>
+          <p>Pedido em andamento, entrega parcial recebida.</p>
+        </div>
+        <div class="legend-card">
+          <span class="badge badge-aguardando">AGUARD. ENTREGA/COLETA</span>
+          <p>Aguardando entrega do fornecedor ou coleta para reparo.</p>
+        </div>
+        <div class="legend-card">
+          <span class="badge badge-analise">EM ANALISE COMPRAS</span>
+          <p>Em processo de análise e resposta pelo setor de compras.</p>
+        </div>
+        <div class="legend-card">
+          <span class="badge badge-reparo">ENVIAR REPARO AGST</span>
+          <p>Item para encaminhar ao serviço de reparo AGST.</p>
+        </div>
+        <div class="legend-card">
+          <span class="badge badge-eliminado">ELIMINADO POR RESIDUO</span>
+          <p>Item descartado ou eliminado por ser resíduo.</p>
+        </div>
+      </div>
+      <div class="charts-row">
+        <div class="chart-card chart-big">
+          <h3 class="chart-title">Distribuição Completa de Status</h3>
+          <canvas id="chartStatusFull" height="260"></canvas>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="app.js"></script>
+  <script>
+    // Drag & drop global no body
+    document.body.addEventListener('dragover', e => { e.preventDefault(); document.getElementById('dropOverlay').style.display = 'flex'; });
+    document.body.addEventListener('dragleave', e => { if (!e.relatedTarget) document.getElementById('dropOverlay').style.display = 'none'; });
+    document.body.addEventListener('drop', e => {
+      e.preventDefault();
+      document.getElementById('dropOverlay').style.display = 'none';
+      const file = e.dataTransfer.files[0];
+      if (file) handleFile(file);
+    });
+
+    // Inicializar ícones Lucide
+    lucide.createIcons();
+  </script>
+</body>
+</html>

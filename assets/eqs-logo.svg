@@ -1,0 +1,20 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- EQS Logo - Double Ring Swoosh -->
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#C0392B;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#7B241C;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="grad2" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#E74C3C;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#922B21;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- Outer ring -->
+  <ellipse cx="64" cy="64" rx="56" ry="32" stroke="url(#grad1)" stroke-width="8" fill="none" transform="rotate(-15 64 64)"/>
+  <!-- Inner ring -->
+  <ellipse cx="64" cy="64" rx="42" ry="22" stroke="url(#grad2)" stroke-width="6" fill="none" transform="rotate(15 64 64)"/>
+  <!-- Swoosh tail -->
+  <path d="M 18 72 Q 8 58, 28 48" stroke="url(#grad1)" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <path d="M 100 52 Q 120 68, 96 78" stroke="url(#grad2)" stroke-width="5" fill="none" stroke-linecap="round"/>
+</svg>
