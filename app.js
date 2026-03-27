@@ -116,125 +116,123 @@ function toggleDarkMode() {
 }
 
 // ===================================================
-// CLOUD DATA (npoint.io - gratuito, sem autenticação)
+// GITHUB DATABASE SYNC (Profissional)
 // ===================================================
-const NPOINT_KEY = 'eqs-bi-npoint-id';
+// CONFIGURAÇÃO DO REPOSITÓRIO
+const GITHUB_CONFIG = {
+  owner: 'SEU_USUARIO',       // Será preenchido na interface
+  repo: 'SEU_REPOSITORIO',    // Será preenchido na interface
+  path: 'data.json',          // Nome do arquivo de banco de dados
+  token: localStorage.getItem('gh_token') || ''
+};
 
 async function autoLoadCloud() {
   const statusEl = document.getElementById('spStatus');
-  const npointId = localStorage.getItem(NPOINT_KEY);
-  
-  if (!npointId) {
-    // Sem dados publicados ainda
-    updateDashboard(PEDIDOS);
-    if (statusEl) {
-      statusEl.className = 'sp-status';
-      statusEl.textContent = 'Importe a planilha para começar.';
-    }
-    if (typeof lucide !== 'undefined') lucide.createIcons();
-    return;
-  }
   
   try {
     if (statusEl) {
       statusEl.className = 'sp-status loading';
-      statusEl.textContent = '⏳ Carregando dados da nuvem...';
+      statusEl.textContent = '⏳ Conectando ao Banco de Dados...';
     }
-    
-    const response = await fetch(`https://api.npoint.io/${npointId}`);
+
+    // Tenta carregar o data.json do GitHub Pages
+    const response = await fetch('./data.json?t=' + Date.now());
     
     if (response.ok) {
-      const cloudData = await response.json();
-      
-      if (cloudData && cloudData.length > 0) {
+      const savedData = await response.json();
+      if (savedData && savedData.length > 0) {
         PEDIDOS.length = 0;
-        PEDIDOS.push(...cloudData);
+        PEDIDOS.push(...savedData);
         updateDashboard(PEDIDOS);
         showSyncBadge();
         
         if (statusEl) {
           statusEl.className = 'sp-status success';
-          statusEl.textContent = `✅ ${cloudData.length} pedidos carregados!`;
+          statusEl.textContent = `✅ ${savedData.length} pedidos carregados do GitHub!`;
         }
         
-        // Mostra botão Publicar no header
         const headerBtn = document.getElementById('btnSyncHeader');
         if (headerBtn) headerBtn.style.display = 'flex';
+        return;
       }
     }
   } catch (e) {
-    console.log('Erro ao carregar da nuvem:', e);
-    updateDashboard(PEDIDOS);
-    if (statusEl) {
-      statusEl.className = 'sp-status error';
-      statusEl.textContent = '⚠️ Erro ao carregar. Importe manualmente.';
-    }
+    console.log('Iniciando sem dados prévios.');
   }
   
-  if (typeof lucide !== 'undefined') lucide.createIcons();
+  updateDashboard(PEDIDOS);
+  if (statusEl) {
+    statusEl.className = 'sp-status';
+    statusEl.textContent = 'Aguardando primeira importação...';
+  }
 }
 
 async function publishToCloud() {
-  if (PEDIDOS.length === 0) {
-    alert('Nenhum dado para publicar. Importe a planilha primeiro.');
+  const token = localStorage.getItem('gh_token');
+  const repoFull = localStorage.getItem('gh_repo'); // formato: usuario/repositorio
+  
+  if (!token || !repoFull) {
+    const userInput = prompt("Configuração Inicial:\nInsira o seu Repositório (ex: usuario/nome-do-repo):");
+    const tokenInput = prompt("Insira o seu GitHub Token (Personal Access Token):");
+    
+    if (userInput && tokenInput) {
+      localStorage.setItem('gh_repo', userInput);
+      localStorage.setItem('gh_token', tokenInput);
+      location.reload();
+    }
     return;
   }
-  
+
+  const [owner, repo] = repoFull.split('/');
   const statusEl = document.getElementById('spStatus');
-  const npointId = localStorage.getItem(NPOINT_KEY);
   
   if (statusEl) {
     statusEl.className = 'sp-status loading';
-    statusEl.textContent = '⏳ Publicando para equipe...';
+    statusEl.textContent = '🚀 Enviando dados para o GitHub...';
   }
-  
+
   try {
-    let response;
+    const content = btoa(unescape(encodeURIComponent(JSON.stringify(PEDIDOS, null, 2))));
     
-    if (npointId) {
-      // Atualiza o bin existente
-      response = await fetch(`https://api.npoint.io/${npointId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(PEDIDOS)
-      });
-    } else {
-      // Cria um novo bin
-      response = await fetch('https://api.npoint.io/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(PEDIDOS)
-      });
+    // 1. Pegar o SHA do arquivo atual (necessário para atualizar no GitHub)
+    let sha = '';
+    const getFile = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/data.json`, {
+      headers: { 'Authorization': `token ${token}` }
+    });
+    
+    if (getFile.ok) {
+      const fileData = await getFile.json();
+      sha = fileData.sha;
     }
-    
+
+    // 2. Enviar os novos dados
+    const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/data.json`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `token ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        message: `📊 Update BI: ${PEDIDOS.length} pedidos em ${new Date().toLocaleString()}`,
+        content: content,
+        sha: sha || undefined
+      })
+    });
+
     if (response.ok) {
-      const result = await response.json();
-      
-      // Salva o ID para uso futuro (na URL retornada)
-      if (!npointId && result) {
-        // Extrai o ID da URL retornada ou do campo 'id'
-        const newId = result.id || (typeof result === 'string' ? result : null);
-        if (newId) {
-          localStorage.setItem(NPOINT_KEY, newId);
-        }
-      }
-      
       if (statusEl) {
         statusEl.className = 'sp-status success';
-        statusEl.textContent = `✅ ${PEDIDOS.length} pedidos publicados para a equipe!`;
+        statusEl.textContent = '✅ Banco de Dados sincronizado com sucesso!';
       }
-      
       showSyncBadge();
     } else {
-      throw new Error(`HTTP ${response.status}`);
+      const error = await response.json();
+      throw new Error(error.message);
     }
-    
+
   } catch (err) {
-    console.error('Publish error:', err);
-    if (statusEl) {
-      statusEl.className = 'sp-status error';
-      statusEl.textContent = `❌ Erro ao publicar: ${err.message}`;
-    }
+    console.error('Git Sync Error:', err);
+    alert("Erro na Sincronização: " + err.message + "\n\nVerifique se o Token e o Nome do Repositório estão corretos.");
   }
 }
 
