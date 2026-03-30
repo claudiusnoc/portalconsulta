@@ -10,16 +10,16 @@ let charts = {};
 
 // Configurações de Estilo (Cores do Tema Roxo)
 const CHART_COLORS = {
-  purple: '#7c3aed',
-  purpleLight: 'rgba(124, 58, 237, 0.1)',
-  blue: '#3b82f6',
-  green: '#10b981',
-  yellow: '#f59e0b',
-  orange: '#f97316',
-  red: '#ef4444',
-  text: '#1f2937',
-  muted: '#6b7280',
-  border: 'rgba(0,0,0,0.05)'
+  purple: '#C0392B',
+  purpleLight: 'rgba(192, 57, 43, 0.08)',
+  blue: '#3a7cc0',
+  green: '#2d8a5e',
+  yellow: '#c5920a',
+  orange: '#c97a2a',
+  red: '#C0392B',
+  text: '#1a1714',
+  muted: '#5c554d',
+  border: 'rgba(0,0,0,0.04)'
 };
 
 const CHART_DEFAULTS = {
@@ -38,7 +38,7 @@ const CHART_DEFAULTS = {
       padding: 12,
       displayColors: false,
       callbacks: {
-        label: (context) => ` ${context.parsed.y || context.parsed} pedidos`
+        label: (context) => ` ${context.raw} pedidos`
       }
     }
   },
@@ -49,26 +49,26 @@ const CHART_DEFAULTS = {
 };
 
 const STATUS_CONFIG = {
-  'FINALIZADO':             { cls: 'badge-finalizado',  label: 'Finalizado' },
-  'EM PROCESSO/PARCIAL':    { cls: 'badge-parcial',     label: 'Em Processo/Parcial' },
-  'AGUARD. ENTREGA/COLETA': { cls: 'badge-aguardando',  label: 'Aguard. Entrega/Coleta' },
-  'EM ANALISE COMPRAS':     { cls: 'badge-analise',     label: 'Em Análise Compras' },
-  'ENVIAR REPARO AGST':     { cls: 'badge-reparo',      label: 'Enviar Reparo AGST' },
-  'ELIMINADO POR RESIDUO':  { cls: 'badge-eliminado',   label: 'Eliminado por Resíduo' },
-  'EM ANDAMENTO':           { cls: 'badge-parcial',     label: 'Em Andamento' },
-  'HUGO ALEXANDRE':         { cls: 'badge-analise',     label: 'Análise Hugo' },
-  'ELOI JOSE':              { cls: 'badge-analise',     label: 'Análise Eloi' },
-  'REJEITADO':              { cls: 'badge-eliminado',   label: 'Rejeitado' },
+  'FINALIZADO': { cls: 'badge-finalizado', label: 'Finalizado' },
+  'EM PROCESSO/PARCIAL': { cls: 'badge-parcial', label: 'Em Processo/Parcial' },
+  'AGUARD. ENTREGA/COLETA': { cls: 'badge-aguardando', label: 'Aguard. Entrega/Coleta' },
+  'EM ANALISE COMPRAS': { cls: 'badge-analise', label: 'Em Análise Compras' },
+  'ENVIAR REPARO AGST': { cls: 'badge-reparo', label: 'Enviar Reparo AGST' },
+  'ELIMINADO POR RESIDUO': { cls: 'badge-eliminado', label: 'Eliminado por Resíduo' },
+  'EM ANDAMENTO': { cls: 'badge-parcial', label: 'Em Andamento' },
+  'HUGO ALEXANDRE': { cls: 'badge-analise', label: 'Análise Hugo' },
+  'ELOI JOSE': { cls: 'badge-analise', label: 'Análise Eloi' },
+  'REJEITADO': { cls: 'badge-eliminado', label: 'Rejeitado' },
 };
 
 const APROV_CONFIG = {
-  'APROVADO':        { cls: 'badge-aprovado', label: 'Aprovado' },
-  'HUGO ALEXANDRE':  { cls: 'badge-hugo',     label: 'Hugo Alexandre' },
-  'ELOI JOSE':       { cls: 'badge-hugo',     label: 'Eloi Jose' },
-  'FINALIZADO':      { cls: 'badge-finalizado',label: 'Finalizado' },
-  'REJEITADO':       { cls: 'badge-eliminado', label: 'Rejeitado' },
-  'PENDENTE':        { cls: 'badge-pendente', label: 'Pendente' },
-  '':                { cls: 'badge-pendente', label: 'Pendente' },
+  'APROVADO': { cls: 'badge-aprovado', label: 'Aprovado' },
+  'HUGO ALEXANDRE': { cls: 'badge-hugo', label: 'Hugo Alexandre' },
+  'ELOI JOSE': { cls: 'badge-hugo', label: 'Eloi Jose' },
+  'FINALIZADO': { cls: 'badge-finalizado', label: 'Finalizado' },
+  'REJEITADO': { cls: 'badge-eliminado', label: 'Rejeitado' },
+  'PENDENTE': { cls: 'badge-pendente', label: 'Pendente' },
+  '': { cls: 'badge-pendente', label: 'Pendente' },
 };
 
 // ===================================================
@@ -77,7 +77,7 @@ const APROV_CONFIG = {
 document.addEventListener('DOMContentLoaded', () => {
   setCurrentDate();
   initTheme();
-  autoLoadCloud();
+  fetchFromGoogleSheets();
 });
 
 function setCurrentDate() {
@@ -102,7 +102,7 @@ function initTheme() {
 function toggleDarkMode() {
   const toggle = document.getElementById('darkModeToggle');
   const isDark = toggle.checked;
-  
+
   if (isDark) {
     document.documentElement.setAttribute('data-theme', 'dark');
     localStorage.setItem('eqs-bi-theme', 'dark');
@@ -110,240 +110,225 @@ function toggleDarkMode() {
     document.documentElement.removeAttribute('data-theme');
     localStorage.setItem('eqs-bi-theme', 'light');
   }
-  
+
   // Re-renderizar ícones Lucide após mudança de tema
   if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 // ===================================================
-// GITHUB DATABASE SYNC (Profissional)
+// HELPER: CONVERSOR UNIVERSAL DE DATAS
 // ===================================================
-// CONFIGURAÇÃO DO REPOSITÓRIO
-const GITHUB_CONFIG = {
-  owner: 'SEU_USUARIO',       // Será preenchido na interface
-  repo: 'SEU_REPOSITORIO',    // Será preenchido na interface
-  path: 'data.json',          // Nome do arquivo de banco de dados
-  token: localStorage.getItem('gh_token') || ''
-};
+// Converte qualquer formato de data recebido do Google Sheets:
+//   - Serial numérico do Excel: 46111 → 30/03/2026
+//   - Formato ISO:              2026-03-30 → 30/03/2026
+//   - Formato já correto:       30/03/2026 → 30/03/2026 (não muda)
+function parseSheetDate(val) {
+  if (!val || val === '') return '';
+  const str = String(val).trim();
 
-async function autoLoadCloud() {
-  const statusEl = document.getElementById('spStatus');
-  
-  try {
-    if (statusEl) {
-      statusEl.className = 'sp-status loading';
-      statusEl.textContent = '⏳ Conectando ao Banco de Dados...';
+  // CASO 1: Serial numérico do Excel (ex: 46111)
+  // O Excel conta dias desde 1 de janeiro de 1900
+  if (/^\d{4,6}$/.test(str)) {
+    const serial = parseInt(str, 10);
+    // Apenas converte se for um número plausível de data (após 2000)
+    if (serial > 36526 && serial < 60000) {
+      // Base: 1 de janeiro de 1900 = serial 1
+      const date = new Date(Date.UTC(1899, 11, 30) + serial * 86400000);
+      const d = date.getUTCDate().toString().padStart(2, '0');
+      const m = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+      const y = date.getUTCFullYear();
+      return `${d}/${m}/${y}`;
     }
+  }
 
-    // Tenta carregar o data.json do GitHub Pages
-    const response = await fetch('./data.json?t=' + Date.now());
-    
-    if (response.ok) {
-      const savedData = await response.json();
-      if (savedData && savedData.length > 0) {
-        PEDIDOS.length = 0;
-        PEDIDOS.push(...savedData);
-        updateDashboard(PEDIDOS);
-        showSyncBadge();
-        
-        if (statusEl) {
-          statusEl.className = 'sp-status success';
-          statusEl.textContent = `✅ ${savedData.length} pedidos carregados do GitHub!`;
-        }
-        
-        const headerBtn = document.getElementById('btnSyncHeader');
-        if (headerBtn) headerBtn.style.display = 'flex';
-        return;
-      }
+  // CASO 2: Formato ISO (ex: 2026-03-30 ou 2026-03-30T00:00:00)
+  if (str.includes('-') && !str.includes('/')) {
+    const parts = str.split('T')[0].split('-'); // remove parte de hora se houver
+    if (parts.length === 3) {
+      return `${parts[2].padStart(2,'0')}/${parts[1].padStart(2,'0')}/${parts[0]}`;
     }
-  } catch (e) {
-    console.log('Iniciando sem dados prévios.');
   }
-  
-  updateDashboard(PEDIDOS);
-  if (statusEl) {
-    statusEl.className = 'sp-status';
-    statusEl.textContent = 'Aguardando primeira importação...';
-  }
+
+  // CASO 3: Já está no formato correto dd/mm/aaaa
+  return str;
 }
 
-async function publishToCloud() {
-  const token = localStorage.getItem('gh_token');
-  const repoFull = localStorage.getItem('gh_repo'); // formato: usuario/repositorio
-  
-  if (!token || !repoFull) {
-    const userInput = prompt("Configuração Inicial:\nInsira o seu Repositório (ex: usuario/nome-do-repo):");
-    const tokenInput = prompt("Insira o seu GitHub Token (Personal Access Token):");
-    
-    if (userInput && tokenInput) {
-      localStorage.setItem('gh_repo', userInput);
-      localStorage.setItem('gh_token', tokenInput);
-      location.reload();
+// ===================================================
+// GOOGLE SHEETS API SYNC
+// ===================================================
+// CONFIGURAÇÃO DA PLANILHA (sem API Key — usa export público CSV)
+// A planilha deve estar compartilhada como "Qualquer pessoa com o link pode ver"
+const G_SHEETS_CONFIG = {
+  sheetId: '1NCznd6Rwmopf14n5VpwHpGRQcY8e4PIh9rRNCmLtk4g'
+};
+
+// Parser CSV robusto (lida com campos entre aspas e vírgulas dentro de células)
+function parseCSV(text) {
+  const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+  return lines.map(line => {
+    const cells = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+        else { inQuotes = !inQuotes; }
+      } else if (ch === ',' && !inQuotes) {
+        cells.push(current.trim());
+        current = '';
+      } else {
+        current += ch;
+      }
     }
+    cells.push(current.trim());
+    return cells;
+  }).filter(row => row.some(cell => cell !== ''));
+}
+
+async function fetchFromGoogleSheets() {
+  const statusEl = document.getElementById('spStatus');
+  const btnSync = document.getElementById('btnSyncHeader');
+  const syncBadge = document.getElementById('syncBadge');
+
+  if (!G_SHEETS_CONFIG.sheetId || G_SHEETS_CONFIG.sheetId.includes('COLE_AQUI')) {
+    if (statusEl) {
+      statusEl.className = 'sp-status error';
+      statusEl.textContent = '⚠️ Sheet ID não configurado no app.js';
+    }
+    updateDashboard(PEDIDOS);
     return;
   }
 
-  const [owner, repo] = repoFull.split('/');
-  const statusEl = document.getElementById('spStatus');
-  
-  if (statusEl) {
-    statusEl.className = 'sp-status loading';
-    statusEl.textContent = '🚀 Enviando dados para o GitHub...';
-  }
-
   try {
-    const content = btoa(unescape(encodeURIComponent(JSON.stringify(PEDIDOS, null, 2))));
-    
-    // 1. Pegar o SHA do arquivo atual (necessário para atualizar no GitHub)
-    let sha = '';
-    const getFile = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/data.json`, {
-      headers: { 'Authorization': `token ${token}` }
-    });
-    
-    if (getFile.ok) {
-      const fileData = await getFile.json();
-      sha = fileData.sha;
+    if (statusEl) {
+      statusEl.className = 'sp-status loading';
+      statusEl.textContent = '⏳ Lendo Google Sheets...';
+    }
+    if (btnSync) btnSync.innerHTML = '<i data-lucide="loader" class="spin" style="width:16px;height:16px"></i> Atualizando...';
+
+    // Export público CSV — não requer API Key nem autenticação
+    const url = `https://docs.google.com/spreadsheets/d/${G_SHEETS_CONFIG.sheetId}/export?format=csv&t=${Date.now()}`;
+
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Erro ao carregar planilha (${response.status}). Verifique se ela está compartilhada publicamente.`);
     }
 
-    // 2. Enviar os novos dados
-    const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/data.json`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `token ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        message: `📊 Update BI: ${PEDIDOS.length} pedidos em ${new Date().toLocaleString()}`,
-        content: content,
-        sha: sha || undefined
-      })
-    });
+    const csvText = await response.text();
+    const rows = parseCSV(csvText);
 
-    if (response.ok) {
+    if (!rows || rows.length < 2) {
       if (statusEl) {
-        statusEl.className = 'sp-status success';
-        statusEl.textContent = '✅ Banco de Dados sincronizado com sucesso!';
+        statusEl.className = 'sp-status';
+        statusEl.textContent = '📊 Planilha conectada, mas vazia.';
       }
-      showSyncBadge();
-    } else {
-      const error = await response.json();
-      throw new Error(error.message);
+      updateDashboard(PEDIDOS);
+      return;
     }
 
-  } catch (err) {
-    console.error('Git Sync Error:', err);
-    alert("Erro na Sincronização: " + err.message + "\n\nVerifique se o Token e o Nome do Repositório estão corretos.");
-  }
-}
+    // Procura a linha que contém os cabeçalhos reais (procurando pela coluna SM ou STATUS)
+    let headerRowIndex = 0;
+    for (let j = 0; j < Math.min(5, rows.length); j++) {
+        if (rows[j].some(val => typeof val === 'string' && (val.toUpperCase() === 'SM' || val.toUpperCase() === 'STATUS'))) {
+            headerRowIndex = j;
+            break;
+        }
+    }
 
-// ===================================================
-// EXCEL IMPORT (Manual)
-// ===================================================
-function handleFileInput(e) {
-  const file = e.target.files[0];
-  if (file) handleFile(file);
-}
-
-function handleFile(file) {
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    const data = new Uint8Array(e.target.result);
-    const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+    const headers = rows[headerRowIndex].map(h => h.toString().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[\.ºº\s]/g, "").trim());
     
     const consolidatedData = [];
     
-    workbook.SheetNames.forEach(name => {
-      // Aceita a aba "COMPRAS", "COMPRAS 2026" ou "COMPRAS 26"
-      // Rejeita explicitamente abas antigas como "COMPRAS 23", "COMPRAS 24", "COMPRAS 25"
-      const upperName = name.toUpperCase();
-      const isCompras = upperName.includes('COMPRAS');
-      const isOldYear = upperName.includes('23') || upperName.includes('24') || upperName.includes('25') || upperName.includes('2023') || upperName.includes('2024') || upperName.includes('2025');
+    // Varre as linhas de dados (começando logo após o cabeçalho)
+    for (let i = headerRowIndex + 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row || row.length === 0) continue; // Pula linha vazia
 
-      if (isCompras && !isOldYear) {
-        const worksheet = workbook.Sheets[name];
-        const rawData = XLSX.utils.sheet_to_json(worksheet, { range: 1, defval: '' });
-        
-        const mapped = rawData.map(row => {
-          // Normaliza chaves para aceitar variações entre abas (ex: S.M. e SM, Data Emissão e Emissão)
-          const normalizedRow = {};
-          for (let k in row) {
-            if (!k) continue;
-            // Remove acentos, pontos, e garante letras maíusculas e sem espaços (ex: STATUS APROVAÇÃO -> STATUSAPROVACAO)
-            const safeKey = k.toString().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[\.ºº\s]/g, "").trim();
-            normalizedRow[safeKey] = row[k];
-          }
+      // Mapeia os valores usando o índice dos cabeçalhos
+      const rowObj = {};
+      headers.forEach((h, index) => {
+        rowObj[h] = row[index] || '';
+      });
 
-          const smVal = normalizedRow['SM'] || normalizedRow['NSM'] || normalizedRow['NUMEROSM'] || 0;
-          const dtEmissao = parseExcelDate(normalizedRow['EMISSAO'] || normalizedRow['DATAEMISSAO'] || normalizedRow['DATA']);
-          
-          let statusVal = (normalizedRow['STATUS'] || '').toString().toUpperCase().trim();
-          let aprovacaoVal = (normalizedRow['STATUSAPROVACAO'] || normalizedRow['APROVACAO'] || '').toString().toUpperCase().trim();
-          
-          // Correção: Itens finalizados, rejeitados ou eliminados NÃO podem ter aprovação 'Pendente'
-          if (['FINALIZADO', 'ELIMINADO POR RESIDUO', 'REJEITADO'].includes(statusVal)) {
-            if (aprovacaoVal === '' || aprovacaoVal === 'PENDENTE') {
-              aprovacaoVal = 'FINALIZADO';
-            }
-          }
+      const smVal = rowObj['SM'] || rowObj['NSM'] || rowObj['NUMEROSM'] || '';
+      const descricaoVal = rowObj['DESCRICAO'] || '';
 
-          return {
-            sm:          smVal,
-            pedido:      normalizedRow['PEDIDO'] || '',
-            emissao:     dtEmissao,
-            status:      statusVal,
-            aprovacao:   aprovacaoVal,
-            descricao:   normalizedRow['DESCRICAO'] || '',
-            atualizacao: parseExcelDate(normalizedRow['DATAATUALIZACAO'] || normalizedRow['ATUALIZACAO']),
-            fonte:       name
-          };
-        }).filter(p => p.sm || p.descricao);
-        
-        consolidatedData.push(...mapped);
+      // ============================================================
+      // FILTRO RIGOROSO: Só processa linhas com SM numérica válida
+      // (ignora linhas de legenda, títulos e linhas sem SM real).
+      // SM válida = string que contém apenas dígitos, ex: "325995"
+      // ============================================================
+      const smString = String(smVal).trim();
+      const isValidSM = smString.length >= 4 && /^\d+$/.test(smString);
+      if (!isValidSM) continue;
+
+      let statusVal = (rowObj['STATUS'] || '').toString().toUpperCase().trim();
+      let aprovacaoVal = (rowObj['STATUSAPROVACAO'] || rowObj['APROVACAO'] || '').toString().toUpperCase().trim();
+
+      // Correção: Itens finalizados, rejeitados ou eliminados NÃO podem ter aprovação 'Pendente'
+      if (['FINALIZADO', 'ELIMINADO POR RESIDUO', 'REJEITADO'].includes(statusVal)) {
+        if (aprovacaoVal === '' || aprovacaoVal === 'PENDENTE') {
+          aprovacaoVal = 'FINALIZADO';
+        }
       }
-    });
 
-    if (consolidatedData.length > 0) {
-      PEDIDOS.length = 0; 
-      PEDIDOS.push(...consolidatedData);
-      
-      updateDashboard(PEDIDOS);
-      showSyncBadge();
-      // Re-inicializa ícones Lucide após mudança de conteúdo
-      if (typeof lucide !== 'undefined') lucide.createIcons();
-      
-      // Mostra botão de salvar para equipe no header
-      const headerBtn = document.getElementById('btnSyncHeader');
-      if (headerBtn) headerBtn.style.display = 'flex';
-      
-      // Atualiza status na sidebar
-      const statusEl = document.getElementById('spStatus');
-      if (statusEl) {
-        statusEl.className = 'sp-status success';
-        statusEl.textContent = `✅ ${consolidatedData.length} pedidos importados! Clique em "Publicar".`;
-      }
+      // Converte ambas as datas usando o conversor universal
+      const dataEmissao = parseSheetDate(rowObj['EMISSAO'] || rowObj['DATAEMISSAO'] || rowObj['DATA'] || '');
+      const dataAtualizacao = parseSheetDate(rowObj['DATAATUALIZACAO'] || rowObj['ATUALIZACAO'] || '');
+
+      consolidatedData.push({
+        sm: smString,
+        pedido: rowObj['PEDIDO'] || '',
+        emissao: dataEmissao,
+        status: statusVal,
+        aprovacao: aprovacaoVal,
+        descricao: descricaoVal,
+        atualizacao: dataAtualizacao,
+        fonte: 'Google Sheets'
+      });
     }
-  };
-  reader.readAsArrayBuffer(file);
-}
 
-function parseExcelDate(val) {
-  if (!val) return '';
-  if (val instanceof Date) {
-    const d = val.getDate().toString().padStart(2, '0');
-    const m = (val.getMonth() + 1).toString().padStart(2, '0');
-    const y = val.getFullYear();
-    return `${d}/${m}/${y}`;
+    // ====================================================
+    // DEDUPLICAÇÃO por SM: A ÚLTIMA ocorrência de cada SM
+    // na planilha vence (a mais recente enviada pelo robô).
+    // Como todas as linhas têm SM válida, nunca haverá
+    // chaves aleatórias que causam duplicação.
+    // ====================================================
+    const smMap = new Map();
+    consolidatedData.forEach(p => {
+      smMap.set(p.sm, p);  // Última entrada da mesma SM sobrescreve a anterior
+    });
+    const deduplicated = Array.from(smMap.values());
+
+    PEDIDOS.length = 0;
+    PEDIDOS.push(...deduplicated);
+
+    updateDashboard(PEDIDOS);
+
+    // Atualiza badges da UI
+    if (syncBadge) {
+      syncBadge.style.display = 'flex';
+      const now = new Date();
+      document.getElementById('syncTime').textContent = `Sincronizado ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    }
+
+    if (statusEl) {
+      statusEl.className = 'sp-status success';
+      statusEl.textContent = `✅ Banco de Dados conectado!`;
+    }
+
+  } catch (err) {
+    console.error('Google Sheets Sync Error:', err);
+    if (statusEl) {
+      statusEl.className = 'sp-status error';
+      statusEl.textContent = '❌ Falha ao buscar dados (Google Sheets).';
+    }
+    updateDashboard(PEDIDOS);
+  } finally {
+    if (btnSync) btnSync.innerHTML = '<i data-lucide="refresh-cw" style="width:16px;height:16px"></i> Sincronizar';
+    if (typeof lucide !== 'undefined') lucide.createIcons();
   }
-  return val.toString().trim();
-}
-
-function showSyncBadge() {
-  const badge = document.getElementById('syncBadge');
-  const time = document.getElementById('syncTime');
-  const now = new Date();
-  badge.style.display = 'flex';
-  time.textContent = `Sincronizado: ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
-  document.getElementById('importBtn').innerHTML = '📥 Atualizar';
 }
 
 // ===================================================
@@ -353,7 +338,7 @@ function updateDashboard(data) {
   const now = new Date();
   const curMonth = (now.getMonth() + 1).toString().padStart(2, '0');
   const curYear = now.getFullYear().toString();
-  
+
   // Filtrar apenas o mês atual para o Dashboard (Home)
   const monthData = data.filter(p => {
     if (!p.emissao || !p.emissao.includes('/')) return false;
@@ -364,9 +349,9 @@ function updateDashboard(data) {
   // Se o mês atual estiver vazio, mostramos tudo mas avisamos no subtítulo
   const displayData = monthData.length > 0 ? monthData : data;
   const isFiltered = monthData.length > 0;
-  
-  const monthNames = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-  document.getElementById('dashboard-subtitle').textContent = isFiltered 
+
+  const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+  document.getElementById('dashboard-subtitle').textContent = isFiltered
     ? `Dados de ${monthNames[now.getMonth()]} ${curYear} • BH Metro ADM • EQS Engenharia`
     : `Total Acumulado (Sem dados para ${monthNames[now.getMonth()]}) • EQS Engenharia`;
 
@@ -377,52 +362,38 @@ function updateDashboard(data) {
   // Define o filtro do dropdown explicitamente para o mês atual e aplica à tabela de pedidos!
   // Isso garante que tabelas não carreguem "Todos os Meses" (que traz itens velhos vazios) no início.
   document.getElementById('filterMes').value = curMonth;
-  applyFilters(); 
+  applyFilters();
 }
 
 function renderKPIs(data) {
   const total = data.length;
-  // A categoria finalizado agora agrega Eliminados e finalizações reais
-  const finalizado = data.filter(p => 
-    p.status === 'FINALIZADO' || 
-    p.status === 'ELIMINADO POR RESIDUO' || 
-    p.status === 'REJEITADO' ||
-    p.aprovacao === 'FINALIZADO'
+  const finalizado = data.filter(p => p.status === 'FINALIZADO' || p.aprovacao === 'FINALIZADO').length;
+  const andamento = data.filter(p => p.status === 'EM PROCESSO/PARCIAL' || p.status === 'EM ANDAMENTO').length;
+  const aguardando = data.filter(p => p.status === 'AGUARD. ENTREGA/COLETA').length;
+  
+  const analise = data.filter(p =>
+    ['EM ANALISE COMPRAS', 'HUGO ALEXANDRE', 'ELOI JOSE', 'ENVIAR REPARO AGST'].includes(p.status) ||
+    ['HUGO ALEXANDRE', 'ELOI JOSE', 'PENDENTE', ''].includes(p.aprovacao)
   ).length;
+  const aprovado = data.filter(p => p.aprovacao === 'APROVADO').length;
   
-  const andamento  = data.filter(p => p.status === 'EM PROCESSO/PARCIAL' || p.status === 'EM ANDAMENTO').length;
-  
-  // Analise agora inclui TUDO que não está finalizado/andamento nem aprovado
-  const analise    = data.filter(p => 
-    p.status === 'EM ANALISE COMPRAS' || 
-    p.status === 'AGUARD. ENTREGA/COLETA' || 
-    p.status === 'HUGO ALEXANDRE' || 
-    p.status === 'ELOI JOSE' ||
-    p.aprovacao === 'HUGO ALEXANDRE' ||
-    p.aprovacao === 'ELOI JOSE' ||
-    p.aprovacao === 'PENDENTE' ||
-    p.aprovacao === ''
-  ).length;
-  
-  const aprovado   = data.filter(p => p.aprovacao === 'APROVADO').length;
+  // Rejeitado só conta REJEITADO (desconectado do Eliminado por Resíduo de acordo com feedback do usuário)
+  const rejeitado = data.filter(p => p.status === 'REJEITADO').length;
 
   animateValue('kpi-total', total);
   animateValue('kpi-finalizado', finalizado);
   animateValue('kpi-andamento', andamento);
+  animateValue('kpi-aguardando', aguardando);
   animateValue('kpi-analise', analise);
   animateValue('kpi-aprovado', aprovado);
-
-  // Rejeitados conta os itens com status REJEITADO ou ELIMINADO POR RESIDUO
-  const rejeitado = data.filter(p => 
-    p.status === 'REJEITADO' || 
-    p.status === 'ELIMINADO POR RESIDUO'
-  ).length;
   animateValue('kpi-rejeitado', rejeitado);
 
   // Update Progress Bars
   if (total > 0) {
     document.getElementById('bar-finalizado').style.width = `${(finalizado / total) * 100}%`;
     document.getElementById('bar-andamento').style.width = `${(andamento / total) * 100}%`;
+    const barAg = document.getElementById('bar-aguardando');
+    if (barAg) barAg.style.width = `${(aguardando / total) * 100}%`;
     document.getElementById('bar-analise').style.width = `${(analise / total) * 100}%`;
     document.getElementById('bar-aprovado').style.width = `${(aprovado / total) * 100}%`;
     const barRej = document.getElementById('bar-rejeitado');
@@ -474,7 +445,7 @@ function renderStatusChart(data) {
         label: 'Pedidos',
         data: Object.values(statusGroups),
         backgroundColor: CHART_COLORS.purple,
-        borderRadius: 12,
+        borderRadius: 4, // Borda menor para não distorcer barras com valores pequenos
         borderSkipped: false,
         barThickness: 24
       }]
@@ -490,11 +461,11 @@ function renderAprovChart(data) {
   const ctx = document.getElementById('chartAprov');
   if (!ctx) return;
 
-  const hugoCount     = data.filter(p => p.aprovacao === 'HUGO ALEXANDRE').length;
-  const eloiCount     = data.filter(p => p.aprovacao === 'ELOI JOSE').length;
+  const hugoCount = data.filter(p => p.aprovacao === 'HUGO ALEXANDRE').length;
+  const eloiCount = data.filter(p => p.aprovacao === 'ELOI JOSE').length;
   // Agrupa os aprovados totais + os finalizados automáticos
   const aprovadoCount = data.filter(p => p.aprovacao === 'APROVADO' || p.aprovacao === 'FINALIZADO').length;
-  
+
   if (charts.aprov) charts.aprov.destroy();
   charts.aprov = new Chart(ctx.getContext('2d'), {
     type: 'doughnut',
@@ -532,14 +503,21 @@ function renderMonthlyChart(data) {
   if (!ctx) return;
 
   const monthCounts = {};
-  const monthLabels = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-  
+  const monthLabels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
   // Inicializa meses com zero
   monthLabels.forEach(m => monthCounts[m] = 0);
+
+  const curYear = new Date().getFullYear().toString();
+  const curYearShort = curYear.slice(-2);
 
   data.forEach(p => {
     if (!p.emissao || !p.emissao.includes('/')) return;
     const parts = p.emissao.split('/');
+    
+    // Ignora dados de outros anos para o gráfico mensal do ano corrente não somar 2024, 2025, 2026 juntos
+    if (parts[2] !== curYear && parts[2] !== curYearShort) return;
+
     const monthIdx = parseInt(parts[1], 10) - 1;
     if (monthIdx >= 0 && monthIdx < 12) {
       monthCounts[monthLabels[monthIdx]]++;
@@ -557,11 +535,11 @@ function renderMonthlyChart(data) {
         borderColor: CHART_COLORS.purple,
         backgroundColor: (context) => {
           const chart = context.chart;
-          const {ctx, chartArea} = chart;
+          const { ctx, chartArea } = chart;
           if (!chartArea) return null;
           const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
-          gradient.addColorStop(0, 'rgba(124, 58, 237, 0)');
-          gradient.addColorStop(1, 'rgba(124, 58, 237, 0.15)');
+          gradient.addColorStop(0, 'rgba(192, 57, 43, 0)');
+          gradient.addColorStop(1, 'rgba(192, 57, 43, 0.12)');
           return gradient;
         },
         fill: true,
@@ -584,10 +562,10 @@ function renderMonthlyChart(data) {
 function buildRow(p) {
   const statusCfg = STATUS_CONFIG[p.status] || { cls: 'badge-pendente', label: p.status || 'Pendente' };
   const aprovCfg = APROV_CONFIG[p.aprovacao] || APROV_CONFIG[''];
-  
+
   return `<tr>
     <td><strong>${p.sm || '-'}</strong></td>
-    <td style="font-family:monospace; color:var(--purple); font-weight:700">${p.pedido || '-'}</td>
+    <td style="font-family:monospace; color:var(--primary); font-weight:700">${p.pedido || '-'}</td>
     <td>${p.emissao || '-'}</td>
     <td><span class="badge ${statusCfg.cls}">${statusCfg.label}</span></td>
     <td><span class="badge ${aprovCfg.cls}">${aprovCfg.label}</span></td>
@@ -618,38 +596,39 @@ function renderPedidosTable(data) {
 // ===================================================
 function applyFilters() {
   const searchInput = document.getElementById('globalSearch');
-  const search  = (searchInput?.value || '').toLowerCase().trim();
-  const status  = document.getElementById('filterStatus')?.value || '';
-  const aprov   = document.getElementById('filterAprov')?.value || '';
-  const mes     = document.getElementById('filterMes')?.value || '';
+  const search = (searchInput?.value || '').toLowerCase().trim();
+  const status = document.getElementById('filterStatus')?.value || '';
+  const aprov = document.getElementById('filterAprov')?.value || '';
+  const mes = document.getElementById('filterMes')?.value || '';
 
   filteredData = PEDIDOS.filter(p => {
     // Busca abrangente
-    const matchSearch = !search || [p.sm, p.pedido, p.descricao, p.status, p.aprovacao].some(f => 
+    const matchSearch = !search || [p.sm, p.pedido, p.descricao, p.status, p.aprovacao].some(f =>
       (f || '').toString().toLowerCase().includes(search)
     );
-    
-    // Suporte a busca direta pelo ID do pedido ou SM
     const matchDirect = !search || (p.pedido || '').toString().toLowerCase() === search || (p.sm || '').toString().toLowerCase() === search;
 
-    // Lógica simplificada e consolidada para "Em Análise Compras"
-    const isAnaliseStatus = status === 'EM ANALISE COMPRAS' && (
-      p.status === 'EM ANALISE COMPRAS' ||
-      p.status === 'AGUARD. ENTREGA/COLETA' ||
-      p.status === 'HUGO ALEXANDRE' || 
-      p.status === 'ELOI JOSE' || 
-      p.aprovacao === 'HUGO ALEXANDRE' || 
-      p.aprovacao === 'ELOI JOSE' ||
-      p.aprovacao === 'PENDENTE' ||
-      p.aprovacao === ''
-    );
+    // Lógica inteligente de Grupos para vincular o Clique do KPI com o filtro
+    let matchStatus = false;
+    if (!status) {
+      matchStatus = true;
+    } else if (status === 'GRP_ANALISE') {
+       matchStatus = ['EM ANALISE COMPRAS', 'HUGO ALEXANDRE', 'ELOI JOSE', 'ENVIAR REPARO AGST'].includes(p.status) || 
+                     ['HUGO ALEXANDRE', 'ELOI JOSE', 'PENDENTE', ''].includes(p.aprovacao);
+    } else if (status === 'GRP_ANDAMENTO') {
+       matchStatus = ['EM PROCESSO/PARCIAL', 'EM ANDAMENTO'].includes(p.status);
+    } else if (status === 'GRP_FINALIZADO') {
+       matchStatus = ['FINALIZADO'].includes(p.status) || p.aprovacao === 'FINALIZADO';
+    } else {
+       matchStatus = p.status === status;
+    }
 
-    const matchStatus = !status || p.status === status || isAnaliseStatus;
-    const matchAprov  = !aprov  || p.aprovacao === aprov;
-    // Filtro de mês agora garante que o ano seja sempre do ano corrente pra evitar mistura de anos passados (Mar 2024, Mar 2025...)
+    const matchAprov = !aprov || p.aprovacao === aprov;
+
+    // Filtro de mês agora garante que o ano seja sempre do ano corrente
     const curYear = new Date().getFullYear().toString();
-    const matchMes    = !mes || (p.emissao && p.emissao.split('/')[1] === mes && (p.emissao.split('/')[2] === curYear || p.emissao.split('/')[2] === curYear.slice(-2)));
-    
+    const matchMes = !mes || (p.emissao && p.emissao.split('/')[1] === mes && (p.emissao.split('/')[2] === curYear || p.emissao.split('/')[2] === curYear.slice(-2)));
+
     return (matchSearch || matchDirect) && matchStatus && matchAprov && matchMes;
   });
 
@@ -658,23 +637,25 @@ function applyFilters() {
   // Auto-navegar para a aba de pedidos se o usuário digitar na busca global e estiver focada
   if (search.length > 0 && document.activeElement === searchInput) {
     if (!document.getElementById('view-pedidos').classList.contains('active')) {
-        showView('pedidos');
+      showView('pedidos');
     }
   }
 }
 
 function filterByKPI(type) {
-  // Reset all filters
+  // Reset all filters EXCEPT the Month filter
+  // The KPI counts reflect the currently selected month, so clicking them
+  // should keep the month filter intact to match the count.
   document.getElementById('globalSearch').value = "";
   document.getElementById('filterStatus').value = "";
   document.getElementById('filterAprov').value = "";
-  document.getElementById('filterMes').value = ""; // Remove o filtro de mês para KPIs globais!
 
-  if (type === 'finalizado') document.getElementById('filterStatus').value = "FINALIZADO";
-  if (type === 'andamento')  document.getElementById('filterStatus').value = "EM PROCESSO/PARCIAL";
-  if (type === 'analise')    document.getElementById('filterStatus').value = "EM ANALISE COMPRAS";
-  if (type === 'aprovado')   document.getElementById('filterAprov').value = "APROVADO";
-  if (type === 'rejeitado')  document.getElementById('filterStatus').value = "ELIMINADO POR RESIDUO";
+  if (type === 'finalizado') document.getElementById('filterStatus').value = "GRP_FINALIZADO";
+  if (type === 'andamento') document.getElementById('filterStatus').value = "GRP_ANDAMENTO";
+  if (type === 'aguardando') document.getElementById('filterStatus').value = "AGUARD. ENTREGA/COLETA";
+  if (type === 'analise') document.getElementById('filterStatus').value = "GRP_ANALISE";
+  if (type === 'aprovado') document.getElementById('filterAprov').value = "APROVADO";
+  if (type === 'rejeitado') document.getElementById('filterStatus').value = "REJEITADO";
 
   applyFilters();
   showView('pedidos'); // Volta para a tela de resultados
@@ -683,10 +664,10 @@ function filterByKPI(type) {
 function showView(id) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById(`view-${id}`).classList.add('active');
-  
+
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById(`nav-${id}`).classList.add('active');
-  
+
   if (id === 'status' && !charts.statusFull) renderStatusFullChart();
 }
 

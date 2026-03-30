@@ -8,8 +8,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <link rel="stylesheet" href="index.css" />
 </head>
@@ -20,7 +20,7 @@
     <div class="sidebar-header">
       <div class="logo-mark">
         <span class="logo-icon">
-          <img src="assets/eqs-logo.svg" alt="EQS" width="28" height="28" />
+          <img src="assets/eqs_engenharia_logo.jpg" alt="EQS Engenharia" class="logo-img" />
         </span>
         <div class="logo-text">
           <strong>EQS</strong>
@@ -42,16 +42,6 @@
         <span>Status</span>
       </a>
 
-      <div class="nav-divider"></div>
-      <p class="nav-section-title">DADOS</p>
-
-      <div class="sharepoint-config">
-        <button class="sp-btn" onclick="publishToCloud()">
-          <i data-lucide="upload-cloud" style="width:14px;height:14px"></i>
-          Publicar para Equipe
-        </button>
-        <div class="sp-status" id="spStatus">Importe a planilha para começar.</div>
-      </div>
     </nav>
     <div class="sidebar-footer">
       <div class="theme-switch-wrap">
@@ -88,13 +78,8 @@
           <span class="search-icon"><i data-lucide="search" style="width:16px;height:16px"></i></span>
           <input type="text" id="globalSearch" class="search-input" placeholder="Buscar pedido, SM, descrição..." oninput="applyFilters()" />
         </div>
-        <!-- Importar Excel -->
-        <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none" onchange="handleFileInput(event)" />
-        <button class="btn-import" id="importBtn" onclick="document.getElementById('fileInput').click()" title="Importar planilha Excel">
-          <i data-lucide="download" style="width:16px;height:16px"></i> Importar Excel
-        </button>
-        <button class="btn-sync" id="btnSyncHeader" onclick="publishToCloud()" title="Publicar dados para equipe" style="display:none">
-          <i data-lucide="upload-cloud" style="width:16px;height:16px"></i> Publicar
+        <button class="btn-import btn-sync" id="btnSyncHeader" onclick="fetchFromGoogleSheets()" title="Sincronizar dados em tempo real">
+          <i data-lucide="refresh-cw" style="width:16px;height:16px"></i> Sincronizar
         </button>
         <div class="sync-badge" id="syncBadge" style="display:none">
           <span class="sync-dot"></span>
@@ -104,14 +89,7 @@
       </div>
     </header>
 
-    <!-- DROP OVERLAY -->
-    <div id="dropOverlay" class="drop-overlay" style="display:none">
-      <div class="drop-box">
-        <div class="drop-icon"><i data-lucide="folder-open" style="width:48px;height:48px"></i></div>
-        <p class="drop-title">Solte o arquivo Excel aqui</p>
-        <p class="drop-sub">COMPRAS FAT A.xlsx</p>
-      </div>
-    </div>
+
 
     <!-- DASHBOARD VIEW -->
     <section id="view-dashboard" class="view active">
@@ -149,6 +127,17 @@
             <h2 class="kpi-value" id="kpi-andamento">0</h2>
           </div>
           <div class="kpi-bar"><div class="kpi-fill fill-blue" id="bar-andamento"></div></div>
+        </div>
+
+        <div class="kpi-card kpi-aguardando clickable" onclick="filterByKPI('aguardando')">
+          <div class="kpi-header">
+            <div class="kpi-icon-box"><span class="material-symbols-rounded" style="font-size: 24px;">local_shipping</span></div>
+          </div>
+          <div class="kpi-body">
+            <p class="kpi-label">Aguard. Entrega</p>
+            <h2 class="kpi-value" id="kpi-aguardando">0</h2>
+          </div>
+          <div class="kpi-bar"><div class="kpi-fill fill-blue" id="bar-aguardando"></div></div>
         </div>
 
         <div class="kpi-card kpi-analise clickable" onclick="filterByKPI('analise')">
@@ -238,6 +227,10 @@
           <option value="EM ANALISE COMPRAS">Em Análise Compras</option>
           <option value="ENVIAR REPARO AGST">Enviar Reparo AGST</option>
           <option value="ELIMINADO POR RESIDUO">Eliminado por Resíduo</option>
+          <option value="REJEITADO">Rejeitado</option>
+          <option value="GRP_ANALISE" style="display:none">Grupo: Análise/Pendente</option>
+          <option value="GRP_ANDAMENTO" style="display:none">Grupo: Andamento</option>
+          <option value="GRP_FINALIZADO" style="display:none">Grupo: Finalizados</option>
         </select>
         <select id="filterAprov" class="filter-select" onchange="applyFilters()">
           <option value="">Todas as Aprovações</option>
@@ -323,16 +316,6 @@
 
   <script src="app.js"></script>
   <script>
-    // Drag & drop global no body
-    document.body.addEventListener('dragover', e => { e.preventDefault(); document.getElementById('dropOverlay').style.display = 'flex'; });
-    document.body.addEventListener('dragleave', e => { if (!e.relatedTarget) document.getElementById('dropOverlay').style.display = 'none'; });
-    document.body.addEventListener('drop', e => {
-      e.preventDefault();
-      document.getElementById('dropOverlay').style.display = 'none';
-      const file = e.dataTransfer.files[0];
-      if (file) handleFile(file);
-    });
-
     // Inicializar ícones Lucide
     lucide.createIcons();
   </script>
