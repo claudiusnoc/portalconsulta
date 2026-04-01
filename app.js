@@ -346,21 +346,21 @@ function updateDashboard(data) {
     return parts[1] === curMonth && (parts[2] === curYear || parts[2] === curYear.slice(-2));
   });
 
-  // Se o mês atual estiver vazio, mostramos tudo mas avisamos no subtítulo
-  const displayData = monthData.length > 0 ? monthData : data;
-  const isFiltered = monthData.length > 0;
-
   const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-  document.getElementById('dashboard-subtitle').textContent = isFiltered
-    ? `Dados de ${monthNames[now.getMonth()]} ${curYear} • BH Metro ADM • EQS Engenharia`
-    : `Total Acumulado (Sem dados para ${monthNames[now.getMonth()]}) • EQS Engenharia`;
+  const hasCurrentMonth = monthData.length > 0;
+
+  // Sem dados no mês atual → exibe zeros (não mostra histórico acumulado)
+  const displayData = hasCurrentMonth ? monthData : [];
+
+  document.getElementById('dashboard-subtitle').textContent = hasCurrentMonth
+    ? `${monthNames[now.getMonth()]} ${curYear} · BH Metro ADM · EQS Engenharia`
+    : `Nenhum pedido em ${monthNames[now.getMonth()]} ainda · BH Metro ADM · EQS Engenharia`;
 
   renderKPIs(displayData);
   renderCharts(displayData);
-  renderPreviewTable(isFiltered ? displayData : data); // Preview focado no mês atual
+  renderPreviewTable(displayData);
 
-  // Define o filtro do dropdown explicitamente para o mês atual e aplica à tabela de pedidos!
-  // Isso garante que tabelas não carreguem "Todos os Meses" (que traz itens velhos vazios) no início.
+  // Define o filtro do dropdown para o mês atual
   document.getElementById('filterMes').value = curMonth;
   applyFilters();
 }
