@@ -10,6 +10,13 @@ let charts = {};
 let sortState = { col: null, dir: 'asc' };
 let pageState = { current: 1, pageSize: 50 };
 
+// Debounce utilitário — evita reconstrução da tabela a cada tecla
+let _searchTimer = null;
+function debouncedSearch() {
+  clearTimeout(_searchTimer);
+  _searchTimer = setTimeout(applyFilters, 200);
+}
+
 // Configurações de Estilo (Cores do Tema Roxo)
 const CHART_COLORS = {
   purple: '#C0392B',
@@ -64,16 +71,16 @@ const STATUS_CONFIG = {
 };
 
 const APROV_CONFIG = {
-  'APROVADO':          { cls: 'badge-aprovado',  label: 'Aprovado' },
-  'HUGO ALEXANDRE':    { cls: 'badge-hugo',      label: 'Hugo Alexandre' },
-  'ELOI JOSE':         { cls: 'badge-eloi',      label: 'Eloi José' },
-  'ELOI JOSÉ':         { cls: 'badge-eloi',      label: 'Eloi José' },  // alias com acento
-  'ADILSON RODRIGUES': { cls: 'badge-adilson',   label: 'Adilson Rodrigues' },
-  'MARCOS CARIAS':     { cls: 'badge-marcos',    label: 'Marcos Carias' },
-  'FINALIZADO':        { cls: 'badge-finalizado', label: 'Finalizado' },
-  'REJEITADO':         { cls: 'badge-eliminado', label: 'Rejeitado' },
-  'PENDENTE':          { cls: 'badge-pendente',  label: 'Pendente' },
-  '':                  { cls: 'badge-pendente',  label: 'Pendente' },
+  'APROVADO': { cls: 'badge-aprovado', label: 'Aprovado' },
+  'HUGO ALEXANDRE': { cls: 'badge-hugo', label: 'Hugo Alexandre' },
+  'ELOI JOSE': { cls: 'badge-eloi', label: 'Eloi José' },
+  'ELOI JOSÉ': { cls: 'badge-eloi', label: 'Eloi José' },  // alias com acento
+  'ADILSON RODRIGUES': { cls: 'badge-adilson', label: 'Adilson Rodrigues' },
+  'MARCOS CARIAS': { cls: 'badge-marcos', label: 'Marcos Carias' },
+  'FINALIZADO': { cls: 'badge-finalizado', label: 'Finalizado' },
+  'REJEITADO': { cls: 'badge-eliminado', label: 'Rejeitado' },
+  'PENDENTE': { cls: 'badge-pendente', label: 'Pendente' },
+  '': { cls: 'badge-pendente', label: 'Pendente' },
 };
 
 // ===================================================
@@ -93,7 +100,7 @@ function startAutoSync() {
     const hh = now.getHours();
     const mm = now.getMinutes();
     const ss = now.getSeconds();
-    
+
     if (ss === 0 && SYNC_SCHEDULE.some(t => t.h === hh && t.m === mm)) {
       fetchFromGoogleSheets();
     }
@@ -106,14 +113,14 @@ function updateNextSyncLabel() {
 
   const now = new Date();
   const todayBase = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  
+
   const candidates = SYNC_SCHEDULE.map(t => {
     const dt = new Date(todayBase);
     dt.setHours(t.h, t.m, 0, 0);
     if (dt <= now) dt.setDate(dt.getDate() + 1); // já passou hoje → amanhã
     return dt;
   });
-  
+
   const next = candidates.reduce((a, b) => a < b ? a : b);
   const timeStr = next.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   labelEl.textContent = `Próxima sincronização: ${timeStr}`;
@@ -168,8 +175,6 @@ function toggleDarkMode() {
     localStorage.setItem('eqs-bi-theme', 'light');
   }
 
-  // Re-renderizar ícones Lucide após mudança de tema
-  if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 // ===================================================
@@ -202,7 +207,7 @@ function parseSheetDate(val) {
   if (str.includes('-') && !str.includes('/')) {
     const parts = str.split('T')[0].split('-'); // remove parte de hora se houver
     if (parts.length === 3) {
-      return `${parts[2].padStart(2,'0')}/${parts[1].padStart(2,'0')}/${parts[0]}`;
+      return `${parts[2].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[0]}`;
     }
   }
 
@@ -299,16 +304,16 @@ async function fetchFromGoogleSheets() {
     // Procura a linha que contém os cabeçalhos reais (procurando pela coluna SM ou STATUS)
     let headerRowIndex = 0;
     for (let j = 0; j < Math.min(5, rows.length); j++) {
-        if (rows[j].some(val => typeof val === 'string' && (val.toUpperCase() === 'SM' || val.toUpperCase() === 'STATUS'))) {
-            headerRowIndex = j;
-            break;
-        }
+      if (rows[j].some(val => typeof val === 'string' && (val.toUpperCase() === 'SM' || val.toUpperCase() === 'STATUS'))) {
+        headerRowIndex = j;
+        break;
+      }
     }
 
     const headers = rows[headerRowIndex].map(h => h.toString().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[\.ºº\s]/g, "").trim());
-    
+
     const consolidatedData = [];
-    
+
     // Varre as linhas de dados (começando logo após o cabeçalho)
     for (let i = headerRowIndex + 1; i < rows.length; i++) {
       const row = rows[i];
@@ -394,9 +399,9 @@ async function fetchFromGoogleSheets() {
     if (statusEl) {
       statusEl.className = 'sp-status error';
       const msgs = {
-        'SEM_INTERNET':           '❌ Sem conexão. Verifique sua internet.',
-        'PLANILHA_PRIVADA':       '❌ Planilha privada. Compartilhe como "qualquer pessoa pode ver".',
-        'PLANILHA_NAO_ENCONTRADA':'❌ Planilha não encontrada. Verifique o ID no app.js.',
+        'SEM_INTERNET': '❌ Sem conexão. Verifique sua internet.',
+        'PLANILHA_PRIVADA': '❌ Planilha privada. Compartilhe como "qualquer pessoa pode ver".',
+        'PLANILHA_NAO_ENCONTRADA': '❌ Planilha não encontrada. Verifique o ID no app.js.',
       };
       statusEl.textContent = msgs[err.message] || `❌ Erro ao sincronizar (${err.message}).`;
     }
@@ -444,12 +449,11 @@ function updateDashboard(data) {
 
 function updateFilterBadge(label) {
   const badge = document.getElementById('kpi-filter-badge');
-  const text  = document.getElementById('kpi-filter-text');
+  const text = document.getElementById('kpi-filter-text');
   if (!badge) return;
   if (label) {
     text.textContent = `Exibindo: ${label}`;
     badge.style.display = 'inline-flex';
-    if (typeof lucide !== 'undefined') lucide.createIcons();
   } else {
     badge.style.display = 'none';
   }
@@ -469,14 +473,14 @@ function renderKPIs(data) {
   const finalizado = data.filter(p => p.status === 'FINALIZADO' || p.aprovacao === 'FINALIZADO').length;
   const andamento = data.filter(p => p.status === 'EM PROCESSO/PARCIAL' || p.status === 'EM ANDAMENTO').length;
   const aguardando = data.filter(p => p.status === 'AGUARD. ENTREGA/COLETA').length;
-  
+
   const APROVADORES_PENDENTES = ['HUGO ALEXANDRE', 'ELOI JOSE', 'ELOI JOSÉ', 'ADILSON RODRIGUES', 'MARCOS CARIAS', 'PENDENTE', ''];
   const analise = data.filter(p =>
     ['EM ANALISE COMPRAS', 'HUGO ALEXANDRE', 'ELOI JOSE', 'ENVIAR REPARO AGST'].includes(p.status) ||
     APROVADORES_PENDENTES.includes(p.aprovacao)
   ).length;
   const aprovado = data.filter(p => p.aprovacao === 'APROVADO').length;
-  
+
   // Rejeitado só conta REJEITADO (desconectado do Eliminado por Resíduo de acordo com feedback do usuário)
   const rejeitado = data.filter(p => p.status === 'REJEITADO').length;
 
@@ -563,14 +567,14 @@ function renderAprovChart(data) {
   const ctx = document.getElementById('chartAprov');
   if (!ctx) return;
 
-  const hugoCount    = data.filter(p => p.aprovacao === 'HUGO ALEXANDRE').length;
-  const eloiCount    = data.filter(p => p.aprovacao === 'ELOI JOSE' || p.aprovacao === 'ELOI JOSÉ').length;
+  const hugoCount = data.filter(p => p.aprovacao === 'HUGO ALEXANDRE').length;
+  const eloiCount = data.filter(p => p.aprovacao === 'ELOI JOSE' || p.aprovacao === 'ELOI JOSÉ').length;
   const adilsonCount = data.filter(p => p.aprovacao === 'ADILSON RODRIGUES').length;
-  const marcosCount  = data.filter(p => p.aprovacao === 'MARCOS CARIAS').length;
+  const marcosCount = data.filter(p => p.aprovacao === 'MARCOS CARIAS').length;
   // Aprovados totais (APROVADO explícito + FINALIZADO automático)
   const aprovadoCount = data.filter(p => p.aprovacao === 'APROVADO' || p.aprovacao === 'FINALIZADO').length;
 
-  const chartData   = [hugoCount, eloiCount, adilsonCount, marcosCount, aprovadoCount];
+  const chartData = [hugoCount, eloiCount, adilsonCount, marcosCount, aprovadoCount];
   const chartLabels = ['Hugo Alexandre', 'Eloi José', 'Adilson Rodrigues', 'Marcos Carias', 'Aprovados'];
   const chartColors = [CHART_COLORS.orange, CHART_COLORS.blue, '#2d8a7e', '#7c5cbf', CHART_COLORS.green];
 
@@ -628,7 +632,7 @@ function renderMonthlyChart(data) {
   data.forEach(p => {
     if (!p.emissao || !p.emissao.includes('/')) return;
     const parts = p.emissao.split('/');
-    
+
     // Ignora dados de outros anos para o gráfico mensal do ano corrente não somar 2024, 2025, 2026 juntos
     if (parts[2] !== curYear && parts[2] !== curYearShort) return;
 
@@ -645,10 +649,10 @@ function renderMonthlyChart(data) {
   const pointBorders = monthLabels.map((_, i) => i === curMonthIdx ? '#fff' : 'transparent');
 
   if (charts.mes) {
-    charts.mes.data.datasets[0].data         = Object.values(monthCounts);
-    charts.mes.data.datasets[0].pointRadius   = pointRadii;
+    charts.mes.data.datasets[0].data = Object.values(monthCounts);
+    charts.mes.data.datasets[0].pointRadius = pointRadii;
     charts.mes.data.datasets[0].pointBackgroundColor = pointColors;
-    charts.mes.data.datasets[0].pointBorderColor     = pointBorders;
+    charts.mes.data.datasets[0].pointBorderColor = pointBorders;
     charts.mes.update('none');
   } else {
     charts.mes = new Chart(ctx.getContext('2d'), {
@@ -702,7 +706,7 @@ function calcDiasDesdeAtualizacao(atualizacao) {
   const d = parseInt(parts[0], 10);
   const dt = new Date(y, m, d);
   if (isNaN(dt.getTime())) return null;
-  const today = new Date(); today.setHours(0,0,0,0);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
   return Math.floor((today - dt) / 86400000);
 }
 
@@ -715,7 +719,7 @@ function calcDiasAberto(emissao) {
   const d = parseInt(parts[0], 10);
   const dt = new Date(y, m, d);
   if (isNaN(dt.getTime())) return null;
-  const today = new Date(); today.setHours(0,0,0,0);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
   return Math.floor((today - dt) / 86400000);
 }
 
@@ -766,9 +770,9 @@ function renderPedidosTable(data) {
   const tbody = document.getElementById('tbody-pedidos');
   if (!data.length) {
     const hasFilters = (document.getElementById('filterStatus')?.value || '') ||
-                       (document.getElementById('filterAprov')?.value || '') ||
-                       (document.getElementById('filterMes')?.value || '') ||
-                       (document.getElementById('globalSearch')?.value || '').trim();
+      (document.getElementById('filterAprov')?.value || '') ||
+      (document.getElementById('filterMes')?.value || '') ||
+      (document.getElementById('globalSearch')?.value || '').trim();
     const noData = !PEDIDOS.length;
     const icon = noData ? 'cloud-off' : 'search-x';
     const title = noData
@@ -864,14 +868,14 @@ function applyFilters() {
     if (!status) {
       matchStatus = true;
     } else if (status === 'GRP_ANALISE') {
-       matchStatus = ['EM ANALISE COMPRAS', 'HUGO ALEXANDRE', 'ELOI JOSE', 'ENVIAR REPARO AGST'].includes(p.status) ||
-                     ['HUGO ALEXANDRE', 'ELOI JOSE', 'ELOI JOSÉ', 'ADILSON RODRIGUES', 'MARCOS CARIAS', 'PENDENTE', ''].includes(p.aprovacao);
+      matchStatus = ['EM ANALISE COMPRAS', 'HUGO ALEXANDRE', 'ELOI JOSE', 'ENVIAR REPARO AGST'].includes(p.status) ||
+        ['HUGO ALEXANDRE', 'ELOI JOSE', 'ELOI JOSÉ', 'ADILSON RODRIGUES', 'MARCOS CARIAS', 'PENDENTE', ''].includes(p.aprovacao);
     } else if (status === 'GRP_ANDAMENTO') {
-       matchStatus = ['EM PROCESSO/PARCIAL', 'EM ANDAMENTO'].includes(p.status);
+      matchStatus = ['EM PROCESSO/PARCIAL', 'EM ANDAMENTO'].includes(p.status);
     } else if (status === 'GRP_FINALIZADO') {
-       matchStatus = ['FINALIZADO'].includes(p.status) || p.aprovacao === 'FINALIZADO';
+      matchStatus = ['FINALIZADO'].includes(p.status) || p.aprovacao === 'FINALIZADO';
     } else {
-       matchStatus = p.status === status;
+      matchStatus = p.status === status;
     }
 
     // Normaliza acento para comparação (ex: "ELOI JOSÉ" filtra tanto "ELOI JOSÉ" quanto "ELOI JOSE")
@@ -885,9 +889,9 @@ function applyFilters() {
       const parts = p.emissao.split('/');
       if (parts.length < 3) return false;
       const monthPart = parts[1];
-      const rawYear   = parts[2].trim();
+      const rawYear = parts[2].trim();
       // Normaliza: "26" → "2026", "2026" → "2026"
-      const yearFull  = rawYear.length === 2 ? '20' + rawYear : rawYear;
+      const yearFull = rawYear.length === 2 ? '20' + rawYear : rawYear;
       return monthPart === mes && yearFull === curYear;
     })();
 
@@ -919,7 +923,7 @@ function sortData(data) {
         if (!s || !s.includes('/')) return 0;
         const [d, m, y] = s.split('/');
         const yf = y && y.length === 2 ? '20' + y : y || '0';
-        return parseInt(yf + (m||'00').padStart(2,'0') + (d||'00').padStart(2,'0'), 10);
+        return parseInt(yf + (m || '00').padStart(2, '0') + (d || '00').padStart(2, '0'), 10);
       };
       va = toNum(a[col]); vb = toNum(b[col]);
     } else {
@@ -927,7 +931,7 @@ function sortData(data) {
       vb = (b[col] || '').toString().toLowerCase();
     }
     if (va < vb) return dir === 'asc' ? -1 : 1;
-    if (va > vb) return dir === 'asc' ?  1 : -1;
+    if (va > vb) return dir === 'asc' ? 1 : -1;
     return 0;
   });
 }
@@ -960,11 +964,11 @@ function filterByKPI(type) {
 
   // 'total' não aplica filtro extra — mostra todos os pedidos do mês
   if (type === 'finalizado') document.getElementById('filterStatus').value = "GRP_FINALIZADO";
-  if (type === 'andamento')  document.getElementById('filterStatus').value = "GRP_ANDAMENTO";
+  if (type === 'andamento') document.getElementById('filterStatus').value = "GRP_ANDAMENTO";
   if (type === 'aguardando') document.getElementById('filterStatus').value = "AGUARD. ENTREGA/COLETA";
-  if (type === 'analise')    document.getElementById('filterStatus').value = "GRP_ANALISE";
-  if (type === 'aprovado')   document.getElementById('filterAprov').value  = "APROVADO";
-  if (type === 'rejeitado')  document.getElementById('filterStatus').value = "REJEITADO";
+  if (type === 'analise') document.getElementById('filterStatus').value = "GRP_ANALISE";
+  if (type === 'aprovado') document.getElementById('filterAprov').value = "APROVADO";
+  if (type === 'rejeitado') document.getElementById('filterStatus').value = "REJEITADO";
 
   applyFilters();
   showView('pedidos');
