@@ -1,18 +1,24 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>BI Compras | Claro Infra MG</title>
-  <meta name="description" content="Dashboard de Business Intelligence para o Controle de Compras 2026 - Contrato Claro Infra MG BH Metro." />
+  <title>Compras FAT A | BH METRO Claudius</title>
+  <meta name="description"
+    content="Dashboard de Business Intelligence para o Controle de Compras 2026 - Contrato Claro Infra MG BH Metro." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0"
+    rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <link rel="stylesheet" href="index.css" />
+  <link rel="icon" href="assets/icon-guia.png" type="image/png" />
 </head>
+
 <body>
 
   <!-- Sidebar -->
@@ -76,9 +82,11 @@
       <div class="top-bar-right">
         <div class="search-wrap">
           <span class="search-icon"><i data-lucide="search" style="width:16px;height:16px"></i></span>
-          <input type="text" id="globalSearch" class="search-input" placeholder="Buscar pedido, SM, descrição..." oninput="applyFilters()" />
+          <input type="text" id="globalSearch" class="search-input" placeholder="Buscar pedido, SM, descrição..."
+            oninput="applyFilters()" />
         </div>
-        <button class="btn-import btn-sync" id="btnSyncHeader" onclick="fetchFromGoogleSheets()" title="Sincronizar dados em tempo real">
+        <button class="btn-import btn-sync" id="btnSyncHeader" onclick="fetchFromGoogleSheets()"
+          title="Sincronizar dados em tempo real">
           <i data-lucide="refresh-cw" style="width:16px;height:16px"></i> Sincronizar
         </button>
         <div class="sync-badge" id="syncBadge" style="display:none">
@@ -115,7 +123,9 @@
             <p class="kpi-label">Total de Pedidos</p>
             <h2 class="kpi-value" id="kpi-total">0</h2>
           </div>
-          <div class="kpi-bar"><div class="kpi-fill fill-purple" id="bar-total" style="width: 100%"></div></div>
+          <div class="kpi-bar">
+            <div class="kpi-fill fill-purple" id="bar-total" style="width: 100%"></div>
+          </div>
         </div>
 
         <div class="kpi-card kpi-finalizado clickable" onclick="filterByKPI('finalizado')">
@@ -126,7 +136,9 @@
             <p class="kpi-label">Finalizados</p>
             <h2 class="kpi-value" id="kpi-finalizado">0</h2>
           </div>
-          <div class="kpi-bar"><div class="kpi-fill fill-green" id="bar-finalizado"></div></div>
+          <div class="kpi-bar">
+            <div class="kpi-fill fill-green" id="bar-finalizado"></div>
+          </div>
         </div>
 
         <div class="kpi-card kpi-andamento clickable" onclick="filterByKPI('andamento')">
@@ -137,18 +149,23 @@
             <p class="kpi-label">Em Andamento</p>
             <h2 class="kpi-value" id="kpi-andamento">0</h2>
           </div>
-          <div class="kpi-bar"><div class="kpi-fill fill-blue" id="bar-andamento"></div></div>
+          <div class="kpi-bar">
+            <div class="kpi-fill fill-blue" id="bar-andamento"></div>
+          </div>
         </div>
 
         <div class="kpi-card kpi-aguardando clickable" onclick="filterByKPI('aguardando')">
           <div class="kpi-header">
-            <div class="kpi-icon-box"><span class="material-symbols-rounded" style="font-size: 24px;">local_shipping</span></div>
+            <div class="kpi-icon-box"><span class="material-symbols-rounded"
+                style="font-size: 24px;">local_shipping</span></div>
           </div>
           <div class="kpi-body">
             <p class="kpi-label">Aguard. Entrega</p>
             <h2 class="kpi-value" id="kpi-aguardando">0</h2>
           </div>
-          <div class="kpi-bar"><div class="kpi-fill fill-blue" id="bar-aguardando"></div></div>
+          <div class="kpi-bar">
+            <div class="kpi-fill fill-blue" id="bar-aguardando"></div>
+          </div>
         </div>
 
         <div class="kpi-card kpi-analise clickable" onclick="filterByKPI('analise')">
@@ -159,7 +176,9 @@
             <p class="kpi-label">Em Análise / Pendente</p>
             <h2 class="kpi-value" id="kpi-analise">0</h2>
           </div>
-          <div class="kpi-bar"><div class="kpi-fill fill-yellow" id="bar-analise"></div></div>
+          <div class="kpi-bar">
+            <div class="kpi-fill fill-yellow" id="bar-analise"></div>
+          </div>
         </div>
 
         <div class="kpi-card kpi-aprovado clickable" onclick="filterByKPI('aprovado')">
@@ -170,7 +189,9 @@
             <p class="kpi-label">Aprovados</p>
             <h2 class="kpi-value" id="kpi-aprovado">0</h2>
           </div>
-          <div class="kpi-bar"><div class="kpi-fill fill-green" id="bar-aprovado"></div></div>
+          <div class="kpi-bar">
+            <div class="kpi-fill fill-green" id="bar-aprovado"></div>
+          </div>
         </div>
 
         <div class="kpi-card kpi-rejeitado clickable" onclick="filterByKPI('rejeitado')">
@@ -181,7 +202,9 @@
             <p class="kpi-label">Rejeitados</p>
             <h2 class="kpi-value" id="kpi-rejeitado">0</h2>
           </div>
-          <div class="kpi-bar"><div class="kpi-fill fill-red" id="bar-rejeitado"></div></div>
+          <div class="kpi-bar">
+            <div class="kpi-fill fill-red" id="bar-rejeitado"></div>
+          </div>
         </div>
       </div>
 
@@ -340,4 +363,5 @@
     lucide.createIcons();
   </script>
 </body>
+
 </html>
