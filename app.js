@@ -210,9 +210,21 @@ async function fetchFromGoogleSheets() {
     // Export público CSV — não requer API Key nem autenticação
     const url = `https://docs.google.com/spreadsheets/d/${G_SHEETS_CONFIG.sheetId}/export?format=csv&t=${Date.now()}`;
 
-    const response = await fetch(url);
+    let response;
+    try {
+      response = await fetch(url);
+    } catch (networkErr) {
+      // fetch() rejeita com TypeError quando não há conexão
+      throw new Error('SEM_INTERNET');
+    }
+    if (response.status === 403 || response.status === 401) {
+      throw new Error('PLANILHA_PRIVADA');
+    }
+    if (response.status === 404) {
+      throw new Error('PLANILHA_NAO_ENCONTRADA');
+    }
     if (!response.ok) {
-      throw new Error(`Erro ao carregar planilha (${response.status}). Verifique se ela está compartilhada publicamente.`);
+      throw new Error(`HTTP_${response.status}`);
     }
 
     const csvText = await response.text();
@@ -322,7 +334,12 @@ async function fetchFromGoogleSheets() {
     console.error('Google Sheets Sync Error:', err);
     if (statusEl) {
       statusEl.className = 'sp-status error';
-      statusEl.textContent = '❌ Falha ao buscar dados (Google Sheets).';
+      const msgs = {
+        'SEM_INTERNET':           '❌ Sem conexão. Verifique sua internet.',
+        'PLANILHA_PRIVADA':       '❌ Planilha privada. Compartilhe como "qualquer pessoa pode ver".',
+        'PLANILHA_NAO_ENCONTRADA':'❌ Planilha não encontrada. Verifique o ID no app.js.',
+      };
+      statusEl.textContent = msgs[err.message] || `❌ Erro ao sincronizar (${err.message}).`;
     }
     updateDashboard(PEDIDOS);
   } finally {
@@ -436,25 +453,27 @@ function renderStatusChart(data) {
     statusGroups[label] = (statusGroups[label] || 0) + 1;
   });
 
-  if (charts.status) charts.status.destroy();
-  charts.status = new Chart(ctx.getContext('2d'), {
-    type: 'bar',
-    data: {
-      labels: Object.keys(statusGroups),
-      datasets: [{
-        label: 'Pedidos',
-        data: Object.values(statusGroups),
-        backgroundColor: CHART_COLORS.purple,
-        borderRadius: 4, // Borda menor para não distorcer barras com valores pequenos
-        borderSkipped: false,
-        barThickness: 24
-      }]
-    },
-    options: {
-      ...CHART_DEFAULTS,
-      indexAxis: 'y'
-    }
-  });
+  if (charts.status) {
+    charts.status.data.labels = Object.keys(statusGroups);
+    charts.status.data.datasets[0].data = Object.values(statusGroups);
+    charts.status.update('none');
+  } else {
+    charts.status = new Chart(ctx.getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: Object.keys(statusGroups),
+        datasets: [{
+          label: 'Pedidos',
+          data: Object.values(statusGroups),
+          backgroundColor: CHART_COLORS.purple,
+          borderRadius: 4,
+          borderSkipped: false,
+          barThickness: 24
+        }]
+      },
+      options: { ...CHART_DEFAULTS, indexAxis: 'y' }
+    });
+  }
 }
 
 function renderAprovChart(data) {
@@ -466,36 +485,40 @@ function renderAprovChart(data) {
   // Agrupa os aprovados totais + os finalizados automáticos
   const aprovadoCount = data.filter(p => p.aprovacao === 'APROVADO' || p.aprovacao === 'FINALIZADO').length;
 
-  if (charts.aprov) charts.aprov.destroy();
-  charts.aprov = new Chart(ctx.getContext('2d'), {
-    type: 'doughnut',
-    data: {
-      labels: ['Hugo Alexandre', 'Eloi Jose', 'Aprovados'],
-      datasets: [{
-        data: [hugoCount, eloiCount, aprovadoCount],
-        backgroundColor: [CHART_COLORS.purple, CHART_COLORS.blue, CHART_COLORS.green],
-        borderWidth: 0,
-        hoverOffset: 6
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      cutout: '75%',
-      plugins: {
-        legend: {
-          display: true,
-          position: 'bottom',
-          labels: {
-            boxWidth: 10,
-            padding: 15,
-            font: { family: 'Inter', size: 11, weight: 600 },
-            color: CHART_COLORS.muted
+  if (charts.aprov) {
+    charts.aprov.data.datasets[0].data = [hugoCount, eloiCount, aprovadoCount];
+    charts.aprov.update('none');
+  } else {
+    charts.aprov = new Chart(ctx.getContext('2d'), {
+      type: 'doughnut',
+      data: {
+        labels: ['Hugo Alexandre', 'Eloi Jose', 'Aprovados'],
+        datasets: [{
+          data: [hugoCount, eloiCount, aprovadoCount],
+          backgroundColor: [CHART_COLORS.purple, CHART_COLORS.blue, CHART_COLORS.green],
+          borderWidth: 0,
+          hoverOffset: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '75%',
+        plugins: {
+          legend: {
+            display: true,
+            position: 'bottom',
+            labels: {
+              boxWidth: 10,
+              padding: 15,
+              font: { family: 'Inter', size: 11, weight: 600 },
+              color: CHART_COLORS.muted
+            }
           }
         }
       }
-    }
-  });
+    });
+  }
 }
 
 function renderMonthlyChart(data) {
@@ -524,36 +547,40 @@ function renderMonthlyChart(data) {
     }
   });
 
-  if (charts.mes) charts.mes.destroy();
-  charts.mes = new Chart(ctx.getContext('2d'), {
-    type: 'line',
-    data: {
-      labels: Object.keys(monthCounts),
-      datasets: [{
-        label: 'Volume',
-        data: Object.values(monthCounts),
-        borderColor: CHART_COLORS.purple,
-        backgroundColor: (context) => {
-          const chart = context.chart;
-          const { ctx, chartArea } = chart;
-          if (!chartArea) return null;
-          const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
-          gradient.addColorStop(0, 'rgba(192, 57, 43, 0)');
-          gradient.addColorStop(1, 'rgba(192, 57, 43, 0.12)');
-          return gradient;
-        },
-        fill: true,
-        tension: 0.4, // Curva Spline
-        pointRadius: 0,
-        pointHitRadius: 10,
-        borderWidth: 3
-      }]
-    },
-    options: {
-      ...CHART_DEFAULTS,
-      interaction: { intersect: false, mode: 'index' }
-    }
-  });
+  if (charts.mes) {
+    charts.mes.data.datasets[0].data = Object.values(monthCounts);
+    charts.mes.update('none');
+  } else {
+    charts.mes = new Chart(ctx.getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: Object.keys(monthCounts),
+        datasets: [{
+          label: 'Volume',
+          data: Object.values(monthCounts),
+          borderColor: CHART_COLORS.purple,
+          backgroundColor: (context) => {
+            const chart = context.chart;
+            const { ctx, chartArea } = chart;
+            if (!chartArea) return null;
+            const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+            gradient.addColorStop(0, 'rgba(192, 57, 43, 0)');
+            gradient.addColorStop(1, 'rgba(192, 57, 43, 0.12)');
+            return gradient;
+          },
+          fill: true,
+          tension: 0.4,
+          pointRadius: 0,
+          pointHitRadius: 10,
+          borderWidth: 3
+        }]
+      },
+      options: {
+        ...CHART_DEFAULTS,
+        interaction: { intersect: false, mode: 'index' }
+      }
+    });
+  }
 }
 
 // ===================================================
@@ -625,9 +652,18 @@ function applyFilters() {
 
     const matchAprov = !aprov || p.aprovacao === aprov;
 
-    // Filtro de mês agora garante que o ano seja sempre do ano corrente
-    const curYear = new Date().getFullYear().toString();
-    const matchMes = !mes || (p.emissao && p.emissao.split('/')[1] === mes && (p.emissao.split('/')[2] === curYear || p.emissao.split('/')[2] === curYear.slice(-2)));
+    // Filtro de mês: normaliza o ano da data para 4 dígitos antes de comparar
+    const curYear = new Date().getFullYear().toString(); // ex: "2026"
+    const matchMes = !mes || (() => {
+      if (!p.emissao || !p.emissao.includes('/')) return false;
+      const parts = p.emissao.split('/');
+      if (parts.length < 3) return false;
+      const monthPart = parts[1];
+      const rawYear   = parts[2].trim();
+      // Normaliza: "26" → "2026", "2026" → "2026"
+      const yearFull  = rawYear.length === 2 ? '20' + rawYear : rawYear;
+      return monthPart === mes && yearFull === curYear;
+    })();
 
     return (matchSearch || matchDirect) && matchStatus && matchAprov && matchMes;
   });
@@ -650,15 +686,16 @@ function filterByKPI(type) {
   document.getElementById('filterStatus').value = "";
   document.getElementById('filterAprov').value = "";
 
+  // 'total' não aplica filtro extra — mostra todos os pedidos do mês
   if (type === 'finalizado') document.getElementById('filterStatus').value = "GRP_FINALIZADO";
-  if (type === 'andamento') document.getElementById('filterStatus').value = "GRP_ANDAMENTO";
+  if (type === 'andamento')  document.getElementById('filterStatus').value = "GRP_ANDAMENTO";
   if (type === 'aguardando') document.getElementById('filterStatus').value = "AGUARD. ENTREGA/COLETA";
-  if (type === 'analise') document.getElementById('filterStatus').value = "GRP_ANALISE";
-  if (type === 'aprovado') document.getElementById('filterAprov').value = "APROVADO";
-  if (type === 'rejeitado') document.getElementById('filterStatus').value = "REJEITADO";
+  if (type === 'analise')    document.getElementById('filterStatus').value = "GRP_ANALISE";
+  if (type === 'aprovado')   document.getElementById('filterAprov').value  = "APROVADO";
+  if (type === 'rejeitado')  document.getElementById('filterStatus').value = "REJEITADO";
 
   applyFilters();
-  showView('pedidos'); // Volta para a tela de resultados
+  showView('pedidos');
 }
 
 function showView(id) {
@@ -667,6 +704,12 @@ function showView(id) {
 
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById(`nav-${id}`).classList.add('active');
+
+  // Ao voltar para o Dashboard limpa a busca global para evitar estado residual
+  if (id === 'dashboard') {
+    const search = document.getElementById('globalSearch');
+    if (search) { search.value = ''; applyFilters(); }
+  }
 
   if (id === 'status' && !charts.statusFull) renderStatusFullChart();
 }
@@ -688,7 +731,12 @@ function renderStatusFullChart() {
     statusGroups[label] = (statusGroups[label] || 0) + 1;
   });
 
-  if (charts.statusFull) charts.statusFull.destroy();
+  if (charts.statusFull) {
+    charts.statusFull.data.labels = Object.keys(statusGroups);
+    charts.statusFull.data.datasets[0].data = Object.values(statusGroups);
+    charts.statusFull.update('none');
+    return;
+  }
   charts.statusFull = new Chart(ctx.getContext('2d'), {
     type: 'bar',
     data: {
