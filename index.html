@@ -16,7 +16,7 @@
 <body>
 
   <!-- Sidebar -->
-  <aside class="sidebar" id="sidebar">
+  <aside class="sidebar collapsed" id="sidebar">
     <div class="sidebar-header">
       <div class="logo-mark">
         <span class="logo-icon">
@@ -62,7 +62,7 @@
   </aside>
 
   <!-- Main Content -->
-  <main class="main-content">
+  <main class="main-content full">
 
     <!-- Header -->
     <header class="top-bar">
@@ -85,6 +85,10 @@
           <span class="sync-dot"></span>
           <span id="syncTime">Sincronizado agora</span>
         </div>
+        <div class="next-sync-info" id="nextSyncInfo">
+          <i data-lucide="clock-4" style="width:12px;height:12px"></i>
+          <span id="nextSyncLabel">Próxima sincronização: 16:00</span>
+        </div>
         <div class="date-badge" id="currentDate"></div>
       </div>
     </header>
@@ -93,6 +97,13 @@
 
     <!-- DASHBOARD VIEW -->
     <section id="view-dashboard" class="view active">
+
+      <!-- Badge de filtro ativo -->
+      <div id="kpi-filter-badge" class="kpi-filter-badge" style="display:none">
+        <i data-lucide="filter" style="width:13px;height:13px"></i>
+        <span id="kpi-filter-text"></span>
+        <button class="kpi-filter-clear" onclick="clearMonthFilter()" title="Limpar filtro de mês">×</button>
+      </div>
 
       <!-- KPI Cards -->
       <div class="kpi-grid">
@@ -206,6 +217,7 @@
                 <th>Status</th>
                 <th>Aprovação</th>
                 <th>Descrição</th>
+                <th>Dias</th>
                 <th>Fonte</th>
                 <th>Atualização</th>
               </tr>
@@ -236,6 +248,9 @@
           <option value="">Todas as Aprovações</option>
           <option value="APROVADO">Aprovado</option>
           <option value="HUGO ALEXANDRE">Hugo Alexandre</option>
+          <option value="ELOI JOSÉ">Eloi José</option>
+          <option value="ADILSON RODRIGUES">Adilson Rodrigues</option>
+          <option value="MARCOS CARIAS">Marcos Carias</option>
           <option value="PENDENTE">Pendente</option>
         </select>
         <select id="filterMes" class="filter-select" onchange="applyFilters()">
@@ -254,26 +269,31 @@
           <option value="12">Dezembro</option>
         </select>
         <span class="filter-count" id="filterCount"></span>
+        <button class="btn-export" onclick="exportCSV()" title="Exportar dados filtrados para Excel/CSV">
+          <i data-lucide="download" style="width:14px;height:14px"></i> Exportar
+        </button>
       </div>
       <div class="table-card">
         <div class="table-wrap">
           <table id="tablePedidos" class="data-table">
             <thead>
               <tr>
-                <th>SM</th>
-                <th>Pedido</th>
-                <th>Emissão</th>
-                <th>Status</th>
-                <th>Aprovação</th>
+                <th data-sort="sm" class="th-sortable">SM</th>
+                <th data-sort="pedido" class="th-sortable">Pedido</th>
+                <th data-sort="emissao" class="th-sortable">Emissão</th>
+                <th data-sort="status" class="th-sortable">Status</th>
+                <th data-sort="aprovacao" class="th-sortable">Aprovação</th>
                 <th>Descrição</th>
+                <th data-sort="dias" class="th-sortable">Dias</th>
                 <th>Fonte</th>
-                <th>Atualização</th>
+                <th data-sort="atualizacao" class="th-sortable">Atualização</th>
               </tr>
             </thead>
             <tbody id="tbody-pedidos"></tbody>
           </table>
         </div>
       </div>
+      <div id="pagination-wrap" class="pagination-wrap"></div>
     </section>
 
     <!-- STATUS VIEW -->

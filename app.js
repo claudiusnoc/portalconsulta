@@ -7,6 +7,8 @@
 const PEDIDOS = [];
 let filteredData = [];
 let charts = {};
+let sortState = { col: null, dir: 'asc' };
+let pageState = { current: 1, pageSize: 50 };
 
 // Configurações de Estilo (Cores do Tema Roxo)
 const CHART_COLORS = {
@@ -62,23 +64,78 @@ const STATUS_CONFIG = {
 };
 
 const APROV_CONFIG = {
-  'APROVADO': { cls: 'badge-aprovado', label: 'Aprovado' },
-  'HUGO ALEXANDRE': { cls: 'badge-hugo', label: 'Hugo Alexandre' },
-  'ELOI JOSE': { cls: 'badge-hugo', label: 'Eloi Jose' },
-  'FINALIZADO': { cls: 'badge-finalizado', label: 'Finalizado' },
-  'REJEITADO': { cls: 'badge-eliminado', label: 'Rejeitado' },
-  'PENDENTE': { cls: 'badge-pendente', label: 'Pendente' },
-  '': { cls: 'badge-pendente', label: 'Pendente' },
+  'APROVADO':          { cls: 'badge-aprovado',  label: 'Aprovado' },
+  'HUGO ALEXANDRE':    { cls: 'badge-hugo',      label: 'Hugo Alexandre' },
+  'ELOI JOSE':         { cls: 'badge-eloi',      label: 'Eloi José' },
+  'ELOI JOSÉ':         { cls: 'badge-eloi',      label: 'Eloi José' },  // alias com acento
+  'ADILSON RODRIGUES': { cls: 'badge-adilson',   label: 'Adilson Rodrigues' },
+  'MARCOS CARIAS':     { cls: 'badge-marcos',    label: 'Marcos Carias' },
+  'FINALIZADO':        { cls: 'badge-finalizado', label: 'Finalizado' },
+  'REJEITADO':         { cls: 'badge-eliminado', label: 'Rejeitado' },
+  'PENDENTE':          { cls: 'badge-pendente',  label: 'Pendente' },
+  '':                  { cls: 'badge-pendente',  label: 'Pendente' },
 };
 
 // ===================================================
 // INITIALIZATION
 // ===================================================
+// AUTO-SYNC (agendado: 10:00 e 16:00 — alinhado com Power Automate)
+// ===================================================
+const SYNC_SCHEDULE = [{ h: 10, m: 0 }, { h: 16, m: 0 }];
+let autoSyncCountdownTimer = null;
+
+function startAutoSync() {
+  if (autoSyncCountdownTimer) clearInterval(autoSyncCountdownTimer);
+
+  autoSyncCountdownTimer = setInterval(() => {
+    const now = new Date();
+    // Disparar quando exatamente no horário (janela de 1 segundo)
+    const hh = now.getHours();
+    const mm = now.getMinutes();
+    const ss = now.getSeconds();
+    
+    if (ss === 0 && SYNC_SCHEDULE.some(t => t.h === hh && t.m === mm)) {
+      fetchFromGoogleSheets();
+    }
+  }, 1000);
+}
+
+function updateNextSyncLabel() {
+  const labelEl = document.getElementById('nextSyncLabel');
+  if (!labelEl) return;
+
+  const now = new Date();
+  const todayBase = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  
+  const candidates = SYNC_SCHEDULE.map(t => {
+    const dt = new Date(todayBase);
+    dt.setHours(t.h, t.m, 0, 0);
+    if (dt <= now) dt.setDate(dt.getDate() + 1); // já passou hoje → amanhã
+    return dt;
+  });
+  
+  const next = candidates.reduce((a, b) => a < b ? a : b);
+  const timeStr = next.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  labelEl.textContent = `Próxima sincronização: ${timeStr}`;
+}
+
+// Atualiza o label a cada minuto
+setInterval(updateNextSyncLabel, 60000);
+
 document.addEventListener('DOMContentLoaded', () => {
   setCurrentDate();
   initTheme();
+  initSortableHeaders();
   fetchFromGoogleSheets();
+  updateNextSyncLabel();
+  startAutoSync();
 });
+
+function initSortableHeaders() {
+  document.querySelectorAll('#tablePedidos .th-sortable').forEach(th => {
+    th.addEventListener('click', () => setSortCol(th.dataset.sort));
+  });
+}
 
 function setCurrentDate() {
   const now = new Date();
@@ -322,12 +379,14 @@ async function fetchFromGoogleSheets() {
     if (syncBadge) {
       syncBadge.style.display = 'flex';
       const now = new Date();
-      document.getElementById('syncTime').textContent = `Sincronizado ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+      const hh = now.getHours().toString().padStart(2, '0');
+      const mm = now.getMinutes().toString().padStart(2, '0');
+      document.getElementById('syncTime').textContent = `${deduplicated.length} pedidos · ${hh}:${mm}`;
     }
 
     if (statusEl) {
       statusEl.className = 'sp-status success';
-      statusEl.textContent = `✅ Banco de Dados conectado!`;
+      statusEl.textContent = `✅ ${deduplicated.length} registros carregados`;
     }
 
   } catch (err) {
@@ -376,9 +435,32 @@ function updateDashboard(data) {
   renderKPIs(displayData);
   renderCharts(displayData);
   renderPreviewTable(displayData);
+  updateFilterBadge(hasCurrentMonth ? `${monthNames[now.getMonth()]} ${curYear}` : null);
 
   // Define o filtro do dropdown para o mês atual
   document.getElementById('filterMes').value = curMonth;
+  applyFilters();
+}
+
+function updateFilterBadge(label) {
+  const badge = document.getElementById('kpi-filter-badge');
+  const text  = document.getElementById('kpi-filter-text');
+  if (!badge) return;
+  if (label) {
+    text.textContent = `Exibindo: ${label}`;
+    badge.style.display = 'inline-flex';
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+function clearMonthFilter() {
+  document.getElementById('filterMes').value = '';
+  document.getElementById('kpi-filter-badge').style.display = 'none';
+  renderKPIs(PEDIDOS);
+  renderCharts(PEDIDOS);
+  renderPreviewTable(PEDIDOS);
   applyFilters();
 }
 
@@ -388,9 +470,10 @@ function renderKPIs(data) {
   const andamento = data.filter(p => p.status === 'EM PROCESSO/PARCIAL' || p.status === 'EM ANDAMENTO').length;
   const aguardando = data.filter(p => p.status === 'AGUARD. ENTREGA/COLETA').length;
   
+  const APROVADORES_PENDENTES = ['HUGO ALEXANDRE', 'ELOI JOSE', 'ELOI JOSÉ', 'ADILSON RODRIGUES', 'MARCOS CARIAS', 'PENDENTE', ''];
   const analise = data.filter(p =>
     ['EM ANALISE COMPRAS', 'HUGO ALEXANDRE', 'ELOI JOSE', 'ENVIAR REPARO AGST'].includes(p.status) ||
-    ['HUGO ALEXANDRE', 'ELOI JOSE', 'PENDENTE', ''].includes(p.aprovacao)
+    APROVADORES_PENDENTES.includes(p.aprovacao)
   ).length;
   const aprovado = data.filter(p => p.aprovacao === 'APROVADO').length;
   
@@ -480,22 +563,30 @@ function renderAprovChart(data) {
   const ctx = document.getElementById('chartAprov');
   if (!ctx) return;
 
-  const hugoCount = data.filter(p => p.aprovacao === 'HUGO ALEXANDRE').length;
-  const eloiCount = data.filter(p => p.aprovacao === 'ELOI JOSE').length;
-  // Agrupa os aprovados totais + os finalizados automáticos
+  const hugoCount    = data.filter(p => p.aprovacao === 'HUGO ALEXANDRE').length;
+  const eloiCount    = data.filter(p => p.aprovacao === 'ELOI JOSE' || p.aprovacao === 'ELOI JOSÉ').length;
+  const adilsonCount = data.filter(p => p.aprovacao === 'ADILSON RODRIGUES').length;
+  const marcosCount  = data.filter(p => p.aprovacao === 'MARCOS CARIAS').length;
+  // Aprovados totais (APROVADO explícito + FINALIZADO automático)
   const aprovadoCount = data.filter(p => p.aprovacao === 'APROVADO' || p.aprovacao === 'FINALIZADO').length;
 
+  const chartData   = [hugoCount, eloiCount, adilsonCount, marcosCount, aprovadoCount];
+  const chartLabels = ['Hugo Alexandre', 'Eloi José', 'Adilson Rodrigues', 'Marcos Carias', 'Aprovados'];
+  const chartColors = [CHART_COLORS.orange, CHART_COLORS.blue, '#2d8a7e', '#7c5cbf', CHART_COLORS.green];
+
   if (charts.aprov) {
-    charts.aprov.data.datasets[0].data = [hugoCount, eloiCount, aprovadoCount];
+    charts.aprov.data.labels = chartLabels;
+    charts.aprov.data.datasets[0].data = chartData;
+    charts.aprov.data.datasets[0].backgroundColor = chartColors;
     charts.aprov.update('none');
   } else {
     charts.aprov = new Chart(ctx.getContext('2d'), {
       type: 'doughnut',
       data: {
-        labels: ['Hugo Alexandre', 'Eloi Jose', 'Aprovados'],
+        labels: chartLabels,
         datasets: [{
-          data: [hugoCount, eloiCount, aprovadoCount],
-          backgroundColor: [CHART_COLORS.purple, CHART_COLORS.blue, CHART_COLORS.green],
+          data: chartData,
+          backgroundColor: chartColors,
           borderWidth: 0,
           hoverOffset: 6
         }]
@@ -503,15 +594,15 @@ function renderAprovChart(data) {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        cutout: '75%',
+        cutout: '72%',
         plugins: {
           legend: {
             display: true,
             position: 'bottom',
             labels: {
               boxWidth: 10,
-              padding: 15,
-              font: { family: 'Inter', size: 11, weight: 600 },
+              padding: 12,
+              font: { family: 'Inter', size: 10, weight: 600 },
               color: CHART_COLORS.muted
             }
           }
@@ -547,8 +638,17 @@ function renderMonthlyChart(data) {
     }
   });
 
+  // Destaque visual no mês atual: ponto maior e vermelho EQS
+  const curMonthIdx = new Date().getMonth(); // 0–11
+  const pointRadii = monthLabels.map((_, i) => i === curMonthIdx ? 7 : 0);
+  const pointColors = monthLabels.map((_, i) => i === curMonthIdx ? CHART_COLORS.purple : 'transparent');
+  const pointBorders = monthLabels.map((_, i) => i === curMonthIdx ? '#fff' : 'transparent');
+
   if (charts.mes) {
-    charts.mes.data.datasets[0].data = Object.values(monthCounts);
+    charts.mes.data.datasets[0].data         = Object.values(monthCounts);
+    charts.mes.data.datasets[0].pointRadius   = pointRadii;
+    charts.mes.data.datasets[0].pointBackgroundColor = pointColors;
+    charts.mes.data.datasets[0].pointBorderColor     = pointBorders;
     charts.mes.update('none');
   } else {
     charts.mes = new Chart(ctx.getContext('2d'), {
@@ -570,7 +670,10 @@ function renderMonthlyChart(data) {
           },
           fill: true,
           tension: 0.4,
-          pointRadius: 0,
+          pointRadius: pointRadii,
+          pointBackgroundColor: pointColors,
+          pointBorderColor: pointBorders,
+          pointBorderWidth: 2,
           pointHitRadius: 10,
           borderWidth: 3
         }]
@@ -586,17 +689,69 @@ function renderMonthlyChart(data) {
 // ===================================================
 // TABLES
 // ===================================================
+
+// Retorna dias desde a emissão (null se data inválida)
+const DIAS_PARADO_ALERTA = 15; // dias sem atualização para acionar alerta
+
+function calcDiasDesdeAtualizacao(atualizacao) {
+  if (!atualizacao || !atualizacao.includes('/')) return null;
+  const parts = atualizacao.split('/');
+  if (parts.length < 3) return null;
+  const y = parseInt(parts[2].length === 2 ? '20' + parts[2] : parts[2], 10);
+  const m = parseInt(parts[1], 10) - 1;
+  const d = parseInt(parts[0], 10);
+  const dt = new Date(y, m, d);
+  if (isNaN(dt.getTime())) return null;
+  const today = new Date(); today.setHours(0,0,0,0);
+  return Math.floor((today - dt) / 86400000);
+}
+
+function calcDiasAberto(emissao) {
+  if (!emissao || !emissao.includes('/')) return null;
+  const parts = emissao.split('/');
+  if (parts.length < 3) return null;
+  const y = parseInt(parts[2].length === 2 ? '20' + parts[2] : parts[2], 10);
+  const m = parseInt(parts[1], 10) - 1;
+  const d = parseInt(parts[0], 10);
+  const dt = new Date(y, m, d);
+  if (isNaN(dt.getTime())) return null;
+  const today = new Date(); today.setHours(0,0,0,0);
+  return Math.floor((today - dt) / 86400000);
+}
+
+const STATUS_FINAL = new Set(['FINALIZADO', 'REJEITADO', 'ELIMINADO POR RESIDUO']);
+
+function buildDiasCell(p) {
+  const dias = calcDiasAberto(p.emissao);
+  if (dias === null) return `<td class="dias-cell">—</td>`;
+  const isFinal = STATUS_FINAL.has(p.status) || p.aprovacao === 'FINALIZADO';
+  if (isFinal) return `<td class="dias-cell dias-ok" title="${dias} dias no total">${dias}d</td>`;
+  if (dias > 30) return `<td class="dias-cell dias-alert" title="Pedido aberto há ${dias} dias">⚠ ${dias}d</td>`;
+  if (dias > 15) return `<td class="dias-cell dias-warn" title="Pedido aberto há ${dias} dias">${dias}d</td>`;
+  return `<td class="dias-cell">${dias}d</td>`;
+}
+
 function buildRow(p) {
   const statusCfg = STATUS_CONFIG[p.status] || { cls: 'badge-pendente', label: p.status || 'Pendente' };
   const aprovCfg = APROV_CONFIG[p.aprovacao] || APROV_CONFIG[''];
 
-  return `<tr>
-    <td><strong>${p.sm || '-'}</strong></td>
+  // Stale alert: open orders not updated for >= DIAS_PARADO_ALERTA days
+  const isFinal = STATUS_FINAL.has(p.status) || p.aprovacao === 'FINALIZADO';
+  const diasAtualiz = calcDiasDesdeAtualizacao(p.atualizacao);
+  const isParado = !isFinal && diasAtualiz !== null && diasAtualiz >= DIAS_PARADO_ALERTA;
+  const paradoTitle = isParado ? `Sem atualização há ${diasAtualiz} dia${diasAtualiz !== 1 ? 's' : ''}` : '';
+  const alertIcon = isParado
+    ? `<span class="parado-icon" title="${paradoTitle}">!</span>`
+    : '';
+
+  return `<tr${isParado ? ' class="row-parado"' : ''}>
+    <td><strong>${p.sm || '-'}</strong>${alertIcon}</td>
     <td style="font-family:monospace; color:var(--primary); font-weight:700">${p.pedido || '-'}</td>
     <td>${p.emissao || '-'}</td>
     <td><span class="badge ${statusCfg.cls}">${statusCfg.label}</span></td>
     <td><span class="badge ${aprovCfg.cls}">${aprovCfg.label}</span></td>
     <td>${p.descricao}</td>
+    ${buildDiasCell(p)}
     <td style="font-size:11px;color:var(--text-faint)">${p.fonte || '-'}</td>
     <td style="font-size:11px;color:var(--text-muted)">${p.atualizacao || '-'}</td>
   </tr>`;
@@ -610,18 +765,87 @@ function renderPreviewTable(data) {
 function renderPedidosTable(data) {
   const tbody = document.getElementById('tbody-pedidos');
   if (!data.length) {
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:48px;color:var(--text-muted)">Nenhum pedido encontrado.</td></tr>`;
+    const hasFilters = (document.getElementById('filterStatus')?.value || '') ||
+                       (document.getElementById('filterAprov')?.value || '') ||
+                       (document.getElementById('filterMes')?.value || '') ||
+                       (document.getElementById('globalSearch')?.value || '').trim();
+    const noData = !PEDIDOS.length;
+    const icon = noData ? 'cloud-off' : 'search-x';
+    const title = noData
+      ? 'Nenhum dado carregado'
+      : 'Nenhum pedido encontrado';
+    const subtitle = noData
+      ? 'Clique em <strong>Sincronizar</strong> para carregar os dados da planilha.'
+      : hasFilters
+        ? 'Tente ajustar ou limpar os filtros aplicados.'
+        : 'Não há pedidos para exibir.';
+    tbody.innerHTML = `<tr class="empty-state-row"><td colspan="9">
+      <div class="empty-state">
+        <i data-lucide="${icon}" class="empty-state-icon"></i>
+        <p class="empty-state-title">${title}</p>
+        <p class="empty-state-sub">${subtitle}</p>
+      </div>
+    </td></tr>`;
+    lucide.createIcons();
     document.getElementById('filterCount').textContent = '0 pedidos';
+    renderPagination(0, 0);
     return;
   }
-  tbody.innerHTML = data.map(buildRow).join('');
-  document.getElementById('filterCount').textContent = `${data.length} pedidos encontrados`;
+
+  // Pagination
+  const total = data.length;
+  const { pageSize } = pageState;
+  const totalPages = Math.ceil(total / pageSize);
+  if (pageState.current > totalPages) pageState.current = totalPages;
+  if (pageState.current < 1) pageState.current = 1;
+  const start = (pageState.current - 1) * pageSize;
+  const pageData = data.slice(start, start + pageSize);
+
+  tbody.innerHTML = pageData.map(buildRow).join('');
+  const showing = `${start + 1}–${Math.min(start + pageSize, total)} de ${total}`;
+  document.getElementById('filterCount').textContent = `${total} pedido${total !== 1 ? 's' : ''} · mostrando ${showing}`;
+  renderPagination(totalPages, pageState.current);
+}
+
+function renderPagination(totalPages, current) {
+  let wrap = document.getElementById('pagination-wrap');
+  if (!wrap) return;
+  if (totalPages <= 1) { wrap.innerHTML = ''; return; }
+
+  const prev = current > 1;
+  const next = current < totalPages;
+
+  // Show max 5 page buttons around current
+  const pages = [];
+  const range = 2;
+  for (let i = Math.max(1, current - range); i <= Math.min(totalPages, current + range); i++) {
+    pages.push(i);
+  }
+
+  wrap.innerHTML = `
+    <button class="page-btn" onclick="goToPage(${current - 1})" ${prev ? '' : 'disabled'}>
+      <i data-lucide="chevron-left" style="width:14px;height:14px"></i>
+    </button>
+    ${pages[0] > 1 ? `<button class="page-btn" onclick="goToPage(1)">1</button>${pages[0] > 2 ? '<span class="page-ellipsis">…</span>' : ''}` : ''}
+    ${pages.map(p => `<button class="page-btn ${p === current ? 'active' : ''}" onclick="goToPage(${p})">${p}</button>`).join('')}
+    ${pages[pages.length - 1] < totalPages ? `${pages[pages.length - 1] < totalPages - 1 ? '<span class="page-ellipsis">…</span>' : ''}<button class="page-btn" onclick="goToPage(${totalPages})">${totalPages}</button>` : ''}
+    <button class="page-btn" onclick="goToPage(${current + 1})" ${next ? '' : 'disabled'}>
+      <i data-lucide="chevron-right" style="width:14px;height:14px"></i>
+    </button>
+  `;
+  lucide.createIcons();
+}
+
+function goToPage(n) {
+  pageState.current = n;
+  renderPedidosTable(filteredData.length || !PEDIDOS.length ? filteredData : sortData(PEDIDOS));
 }
 
 // ===================================================
 // FILTERS & NAVIGATION
 // ===================================================
 function applyFilters() {
+  pageState.current = 1; // reset to first page on any filter change
   const searchInput = document.getElementById('globalSearch');
   const search = (searchInput?.value || '').toLowerCase().trim();
   const status = document.getElementById('filterStatus')?.value || '';
@@ -640,8 +864,8 @@ function applyFilters() {
     if (!status) {
       matchStatus = true;
     } else if (status === 'GRP_ANALISE') {
-       matchStatus = ['EM ANALISE COMPRAS', 'HUGO ALEXANDRE', 'ELOI JOSE', 'ENVIAR REPARO AGST'].includes(p.status) || 
-                     ['HUGO ALEXANDRE', 'ELOI JOSE', 'PENDENTE', ''].includes(p.aprovacao);
+       matchStatus = ['EM ANALISE COMPRAS', 'HUGO ALEXANDRE', 'ELOI JOSE', 'ENVIAR REPARO AGST'].includes(p.status) ||
+                     ['HUGO ALEXANDRE', 'ELOI JOSE', 'ELOI JOSÉ', 'ADILSON RODRIGUES', 'MARCOS CARIAS', 'PENDENTE', ''].includes(p.aprovacao);
     } else if (status === 'GRP_ANDAMENTO') {
        matchStatus = ['EM PROCESSO/PARCIAL', 'EM ANDAMENTO'].includes(p.status);
     } else if (status === 'GRP_FINALIZADO') {
@@ -650,7 +874,9 @@ function applyFilters() {
        matchStatus = p.status === status;
     }
 
-    const matchAprov = !aprov || p.aprovacao === aprov;
+    // Normaliza acento para comparação (ex: "ELOI JOSÉ" filtra tanto "ELOI JOSÉ" quanto "ELOI JOSE")
+    const normAprov = (v) => v.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const matchAprov = !aprov || normAprov(p.aprovacao) === normAprov(aprov);
 
     // Filtro de mês: normaliza o ano da data para 4 dígitos antes de comparar
     const curYear = new Date().getFullYear().toString(); // ex: "2026"
@@ -668,7 +894,7 @@ function applyFilters() {
     return (matchSearch || matchDirect) && matchStatus && matchAprov && matchMes;
   });
 
-  renderPedidosTable(filteredData);
+  renderPedidosTable(sortData(filteredData));
 
   // Auto-navegar para a aba de pedidos se o usuário digitar na busca global e estiver focada
   if (search.length > 0 && document.activeElement === searchInput) {
@@ -676,6 +902,52 @@ function applyFilters() {
       showView('pedidos');
     }
   }
+}
+
+// Ordena array de pedidos pelo sortState global
+function sortData(data) {
+  const { col, dir } = sortState;
+  if (!col) return data;
+  return [...data].sort((a, b) => {
+    let va, vb;
+    if (col === 'dias') {
+      va = calcDiasAberto(a.emissao) ?? -1;
+      vb = calcDiasAberto(b.emissao) ?? -1;
+    } else if (col === 'emissao' || col === 'atualizacao') {
+      // Converte dd/mm/aaaa para número comparável aaaammdd
+      const toNum = s => {
+        if (!s || !s.includes('/')) return 0;
+        const [d, m, y] = s.split('/');
+        const yf = y && y.length === 2 ? '20' + y : y || '0';
+        return parseInt(yf + (m||'00').padStart(2,'0') + (d||'00').padStart(2,'0'), 10);
+      };
+      va = toNum(a[col]); vb = toNum(b[col]);
+    } else {
+      va = (a[col] || '').toString().toLowerCase();
+      vb = (b[col] || '').toString().toLowerCase();
+    }
+    if (va < vb) return dir === 'asc' ? -1 : 1;
+    if (va > vb) return dir === 'asc' ?  1 : -1;
+    return 0;
+  });
+}
+
+// Handler de clique nos cabeçalhos — chamado pelo onclick nos <th>
+function setSortCol(col) {
+  if (sortState.col === col) {
+    sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortState.col = col;
+    sortState.dir = 'asc';
+  }
+  // Atualiza classes visuais nos th
+  document.querySelectorAll('#tablePedidos .th-sortable').forEach(th => {
+    th.classList.remove('sort-asc', 'sort-desc');
+    if (th.dataset.sort === col) {
+      th.classList.add(sortState.dir === 'asc' ? 'sort-asc' : 'sort-desc');
+    }
+  });
+  renderPedidosTable(sortData(filteredData));
 }
 
 function filterByKPI(type) {
@@ -719,6 +991,38 @@ function toggleSidebar() {
   const main = document.querySelector('.main-content');
   sidebar.classList.toggle('collapsed');
   main.classList.toggle('full');
+}
+
+// ===================================================
+// EXPORT CSV
+// ===================================================
+function exportCSV() {
+  const source = filteredData.length ? filteredData : PEDIDOS;
+  if (!source.length) return;
+
+  const headers = ['SM', 'Pedido', 'Emissão', 'Status', 'Aprovação', 'Descrição', 'Dias em Aberto', 'Fonte', 'Atualização'];
+  const rows = source.map(p => {
+    const dias = calcDiasAberto(p.emissao);
+    return [
+      p.sm, p.pedido, p.emissao, p.status, p.aprovacao,
+      p.descricao, dias !== null ? dias : '',
+      p.fonte, p.atualizacao
+    ].map(v => {
+      const s = (v ?? '').toString().replace(/"/g, '""');
+      return /[,"\n\r]/.test(s) ? `"${s}"` : s;
+    });
+  });
+
+  const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+  const bom = '\uFEFF'; // UTF-8 BOM for Excel
+  const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const date = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-');
+  a.href = url;
+  a.download = `pedidos-eqs-${date}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function renderStatusFullChart() {

@@ -514,6 +514,37 @@ body::before {
 }
 @keyframes pulse-green { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
 
+/* ─── AUTO-SYNC ──────────────────────────────── */
+.autosync-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.autosync-select {
+  appearance: none;
+  background: var(--bg-card);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  padding: 6px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.autosync-select:hover { border-color: var(--primary); color: var(--text-primary); }
+.autosync-countdown {
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--primary);
+  min-width: 36px;
+  text-align: right;
+}
+
 .date-badge {
   background: var(--bg-card);
   backdrop-filter: var(--blur);
@@ -525,6 +556,35 @@ body::before {
   white-space: nowrap;
   font-weight: 600;
 }
+
+/* ─── FILTER ACTIVE BADGE ───────────────────── */
+.kpi-filter-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--primary-bg);
+  border: 1px solid rgba(192, 57, 43, 0.18);
+  border-radius: 99px;
+  padding: 6px 14px 6px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--primary);
+  margin-bottom: 16px;
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+}
+.kpi-filter-clear {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--primary);
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 0 0 2px;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+.kpi-filter-clear:hover { opacity: 1; }
 
 /* ─── VIEWS ──────────────────────────────────── */
 .view { display: none; padding: 24px 28px; animation: viewFadeIn 0.4s ease; }
@@ -769,6 +829,57 @@ body::before {
 }
 .data-table tbody tr:last-child td { border-bottom: none; }
 
+/* ─── DIAS EM ABERTO ─────────────────────────── */
+.dias-cell {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  white-space: nowrap;
+  text-align: center;
+}
+.dias-ok    { color: var(--text-faint); font-weight: 500; }
+.dias-warn  { color: var(--yellow); }
+.dias-alert { color: var(--red); }
+
+/* ─── PARADO ALERT ───────────────────────────── */
+.parado-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #E74C3C;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  margin-left: 6px;
+  vertical-align: middle;
+  cursor: default;
+  flex-shrink: 0;
+}
+.row-parado td:first-child {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ─── TABLE SORT ─────────────────────────────── */
+.th-sortable {
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+}
+.th-sortable:hover { color: var(--primary); }
+.th-sortable::after {
+  content: ' ↕';
+  font-size: 10px;
+  opacity: 0.35;
+}
+.th-sortable.sort-asc::after  { content: ' ↑'; opacity: 0.8; color: var(--primary); }
+.th-sortable.sort-desc::after { content: ' ↓'; opacity: 0.8; color: var(--primary); }
+
 /* ─── BADGES — Frosted Pill Style ────────────── */
 .badge {
   display: inline-flex;
@@ -792,6 +903,9 @@ body::before {
 .badge-eliminado   { background: var(--red-bg);    color: var(--red);    border: 1px solid rgba(239, 68, 68, 0.15); }
 .badge-aprovado    { background: var(--green-bg);  color: var(--green);  border: 1px solid rgba(16, 185, 129, 0.15); }
 .badge-hugo        { background: var(--orange-bg); color: var(--orange); border: 1px solid rgba(249, 115, 22, 0.15); }
+.badge-eloi        { background: var(--blue-bg);   color: var(--blue);   border: 1px solid rgba(58, 124, 192, 0.15); }
+.badge-adilson     { background: rgba(45,138,126,0.08); color: #2d8a7e;  border: 1px solid rgba(45,138,126,0.15); }
+.badge-marcos      { background: rgba(124,92,191,0.08); color: #7c5cbf;  border: 1px solid rgba(124,92,191,0.15); }
 .badge-pendente    { background: var(--yellow-bg); color: var(--yellow); border: 1px solid rgba(245, 158, 11, 0.15); }
 
 /* ─── DROP OVERLAY ───────────────────────────── */
@@ -847,6 +961,109 @@ body::before {
 }
 
 .filter-count { margin-left: auto; font-size: 12px; color: var(--text-muted); font-weight: 600; }
+
+/* ─── EMPTY STATE ────────────────────────────── */
+.empty-state-row td { border: none !important; }
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 24px;
+  gap: 12px;
+}
+.empty-state-icon {
+  width: 48px;
+  height: 48px;
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+.empty-state-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 0;
+}
+.empty-state-sub {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0;
+  text-align: center;
+  max-width: 360px;
+  line-height: 1.6;
+}
+
+/* ─── PAGINATION ─────────────────────────────── */
+.pagination-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 16px 0 8px;
+  flex-wrap: wrap;
+}
+.page-btn {
+  min-width: 34px;
+  height: 34px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.page-btn:hover:not(:disabled) {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+.page-btn.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+.page-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.page-ellipsis {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 0 4px;
+  line-height: 34px;
+}
+
+/* ─── EXPORT BUTTON ──────────────────────────── */
+.btn-export {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s, border-color 0.18s;
+  white-space: nowrap;
+}
+.btn-export:hover {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
 
 /* ─── BUTTONS ────────────────────────────────── */
 .btn-secondary {
