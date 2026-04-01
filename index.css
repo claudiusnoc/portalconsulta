@@ -43,7 +43,8 @@
   --radius-sm: 12px;
   --radius-md: 16px;
   --radius-lg: 24px;
-  --transition: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition: 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  --spring: 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
   --font: 'Inter', system-ui, sans-serif;
 
   /* ── Glass shadows ── */
@@ -240,6 +241,9 @@ body::before {
   background: rgba(255, 255, 255, 0.25);
   color: var(--text-primary);
 }
+.nav-item:active {
+  transform: scale(0.96);
+}
 [data-theme="dark"] .nav-item:hover {
   background: rgba(255, 255, 255, 0.06);
 }
@@ -420,6 +424,9 @@ body::before {
   border-color: rgba(192, 57, 43, 0.15);
   box-shadow: 0 0 16px var(--accent-glow);
 }
+.menu-toggle:active {
+  transform: scale(0.92);
+}
 
 .page-title {
   font-size: 22px;
@@ -489,6 +496,10 @@ body::before {
   border-color: transparent;
   box-shadow: 0 4px 20px var(--accent-glow);
   transform: translateY(-1px);
+}
+.btn-import:active {
+  transform: translateY(1px) scale(0.96);
+  box-shadow: 0 2px 10px var(--accent-glow);
 }
 
 .sync-badge {
@@ -587,11 +598,26 @@ body::before {
 .kpi-filter-clear:hover { opacity: 1; }
 
 /* ─── VIEWS ──────────────────────────────────── */
-.view { display: none; padding: 24px 28px; animation: viewFadeIn 0.4s ease; }
+.view { display: none; padding: 24px 28px; }
 .view.active { display: block; }
+.view.active > * {
+  animation: viewFadeIn 0.5s var(--spring) backwards;
+}
+.view.active .kpi-card:nth-child(1) { animation-delay: 0.05s; }
+.view.active .kpi-card:nth-child(2) { animation-delay: 0.10s; }
+.view.active .kpi-card:nth-child(3) { animation-delay: 0.15s; }
+.view.active .kpi-card:nth-child(4) { animation-delay: 0.20s; }
+.view.active .kpi-card:nth-child(5) { animation-delay: 0.25s; }
+.view.active .kpi-card:nth-child(6) { animation-delay: 0.30s; }
+.view.active .kpi-card:nth-child(7) { animation-delay: 0.35s; }
+
+.view.active .charts-row { animation-delay: 0.20s; }
+.view.active .table-card { animation-delay: 0.30s; }
+.view.active .status-legend-grid { animation-delay: 0.10s; }
+
 @keyframes viewFadeIn {
-  from { opacity: 0; transform: translateY(12px); }
-  to   { opacity: 1; transform: none; }
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* ─── KPI GRID — Glass Cards ────────────────── */
@@ -610,7 +636,7 @@ body::before {
   gap: 12px;
   position: relative;
   overflow: hidden;
-  transition: all var(--transition);
+  transition: all var(--spring);
 }
 
 /* Glass shimmer highlight on top edge */
@@ -639,12 +665,15 @@ body::before {
 
 .kpi-card.clickable { cursor: pointer; }
 .kpi-card:hover {
-  transform: translateY(-6px) scale(1.01);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.6);
-  border-color: rgba(192, 57, 43, 0.1);
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  border-color: rgba(192, 57, 43, 0.15);
 }
 [data-theme="dark"] .kpi-card:hover {
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+.kpi-card.clickable:active {
+  transform: translateY(-2px) scale(0.98);
 }
 
 .kpi-header {
@@ -741,6 +770,14 @@ body::before {
   flex-direction: column;
   position: relative;
   overflow: hidden;
+  transition: transform var(--spring), box-shadow var(--spring);
+}
+.chart-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+[data-theme="dark"] .chart-card:hover {
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 .chart-card::before {
   content: '';
@@ -818,6 +855,7 @@ body::before {
   vertical-align: middle;
   white-space: nowrap;
   font-weight: 500;
+  transition: transform var(--spring), background 0.25s ease;
 }
 
 .data-table tbody td:last-child { white-space: normal; max-width: 340px; }
@@ -825,7 +863,11 @@ body::before {
 .data-table tbody tr { transition: background 0.25s ease; }
 .data-table tbody tr:hover td {
   background: var(--bg-card-hover);
+  transform: translateX(4px);
   cursor: pointer;
+}
+.data-table tbody tr:active td {
+  transform: translateX(2px) scale(0.99);
 }
 .data-table tbody tr:last-child td { border-bottom: none; }
 
